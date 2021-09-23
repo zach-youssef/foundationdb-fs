@@ -1,78 +1,75 @@
 # FoundationFS - File System Layer over FoundationDB
 
-The purpose of this Project Description is to present the ideas proposed and decisions made during the preliminary envisioning and inception phase of the project. The goal is to analyze an initial concept proposal at a strategic level of detail and attain/compose an agreement between the project team members and the project customer (mentors and instructors) on the desired solution and overall project direction.
+---
 
-This template proposal contains a number of sections, which you can edit/modify/add/delete/organize as you like. Some key sections we’d like to have in the proposal are:
+## Vision and Goals Of The Project
+FoundationDB is a distributed key-store with strong ACID guarantees (Atomicity, Consistency, Isolation, Distributed). The core vision is to build a filesystem layer on top of FoundationDB that can leverage these internal consistencies to create a reliable (yet slow) distributed file store.
 
-- Vision: An executive summary of the vision, goals, users, and general scope of the intended project.
+Using Linux’s Filesystem in Userspace (FUSE) module, our software will enable mounting the filesystem and interacting with it like a normal Unix directory, with our software behind the scenes translating reads and writes to FoundationDB transactions.
 
-- Solution Concept: the approach the project team will take to meet the business needs. This section also provides an overview of the architectural and technical designs made for implementing the project.
+Each individual key retrieval or update has the potential to be slow. In order for advanced filesystem operations such as renaming and hard links to work, we will need layers of indirection that will require each operation to take multiple key retrievals. Because of this, we will be optimizing our design for functionality and correctness first, speed second. Designing an appropriate mapping of a file/directory structure into key-value storage is the most significant aspect of this project.
 
-- Scope: the boundary of the solution defined by itemizing the intended features and functions in detail, determining what is out of scope, a release strategy and possibly the criteria by which the solution will be accepted by users and operations.
+By running additional instances of FoundationDB, our software layer should scale without any changes. If our filesystem design is successful, this open source project will hopefully be a useful layer that can be shared with the larger FoundationDB community.
 
-Project Proposal can be used during the follow-up analysis and design meetings to give context to efforts of more detailed technical specifications and plans. It provides a clear direction for the project team; outlines project goals, priorities, and constraints; and sets expectations.
+## Users/Personas Of The Project
+
+FoundationDB is designed for users who favor Consistency, Distribution, Scalability, Security of data storage (e.g. financial transactions) over performance / speed. This project intends to add a distributed file system layer using key-value pair mapping to allow client applications to perform file / directory operations in a uniform way. For instance, users can perform *read* and *write* operations to a file, while more complex operations like *links* or *rename* might be implemented at the end. 
+
+We could see this filesystem being mounted either by desktop users sharing resources, or by servers accessing shared datacenter storage.
 
 ---
 
-## 1. Vision and Goals Of The Project:
+## Scope and Features Of The Project
 
-The vision section describes the final desired state of the project once the project is complete. It also specifies the key goals of the project. This section provides a context for decision-making. A shared vision among all team members can help ensuring that the solution meets the intended goals. A solid vision clarifies perspective and facilitates decision-making.
+Support common file system functionalities such as read, write, move, rename and delete. Hard and symbolic link support will serve as interesting stretch goals.
 
-The vision statement should be specific enough that you can look at a proposed solution and say either "yes, this meets the vision and goals", or "no, it does not".
+To our users, our system should appear like any other mounted drive. Under the hood, we will have designed a consistent method for mapping filesystem operations to key-value updates and reads.
 
----
+Operations performed on the File System could be slow due to stable architecture provided by FoundationDB
 
-## 2. Users/Personas Of The Project:
-
-This section describes the principal user roles of the project together with the key characteristics of these roles. This information will inform the design and the user scenarios. A complete set of roles helps in ensuring that high-level requirements can be identified in the product backlog.
-
-Again, the description should be specific enough that you can determine whether user A, performing action B, is a member of the set of users the project is designed for.
+Provide a test suite for Client File system that is resilient to failures in a distributed setting
 
 ---
 
-## 3. Scope and Features Of The Project:
+## Solution Concept
 
-The Scope places a boundary around the solution by detailing the range of features and functions of the project. This section helps to clarify the solution scope and can explicitly state what will not be delivered as well.
+We will be using Java to develop a client layout that bridges the FUSE and FoundationDB APIs.
 
-It should be specific enough that you can determine that e.g. feature A is in-scope, while feature B is out-of-scope.
 
----
+The actual method we use to map a file/directory structure over a key value store will require time and resources to design, and we consider it the primary challenge of the project. We will explore the methodologies used by existing key-value filesystems (such as kvefs), mimicking an ext-style inode tree, as well as explore variations on naive approaches such as simply having the file path be the key used in the store.
 
-## 4. Solution Concept
 
-This section provides a high-level outline of the solution.
+The end result should have an architecture similar to the following:
 
-Global Architectural Structure Of the Project:
-
-This section provides a high-level architecture or a conceptual diagram showing the scope of the solution. If wireframes or visuals have already been done, this section could also be used to show how the intended solution will look. This section also provides a walkthrough explanation of the architectural structure.
-
-Design Implications and Discussion:
-
-This section discusses the implications and reasons of the design decisions made during the global architecture design.
+![Image of Diagram](https://imgur.com/a/SBL2aBO)
 
 ---
 
-## 5. Acceptance criteria
+## Acceptance criteria
 
-This section discusses the minimum acceptance criteria at the end of the project and stretch goals.
+- Design a mapping between a files and directories structure to key-value
+- The ability to *read*, *write*, *open*, *close*, and *rename*, both files and directories from our Java layer.
+- Being able to mount our application as a FUSE directory in Linux
+  + Stretch goals
+  + Hard links
+  + Soft links
+  + Permission system (*chmod*)
+- Test suite ensures File system is resilient to random failures and concurrency issues
 
 ---
 
-## 6. Release Planning:
+## Release Planning
 
-Release planning section describes how the project will deliver incremental sets of features and functions in a series of releases to completion. Identification of user stories associated with iterations that will ease/guide sprint planning sessions is encouraged. Higher level details for the first iteration is expected.
+We will attempt to deliver our product in the following stages of functionality:
+1. Small Java client that can *read* and *write* key-value pairs to a FoundationDB cluster
+2. A complete spec for our key-value filesystem mapping
+3. Ability to perform *read*, *write*, *rmdir*, and *mkdir* operations to our Java layer
+4. FUSE API integration for simple file/directory operations
+5. Implement stretch features to Java client & FUSE integration 
 
 ---
-
 ## General comments
 
-Remember that you can always add features at the end of the semester, but you can't go back in time and gain back time you spent on features that you couldn't complete.
+FoundationDB is a NoSQL database armed with ACID property. Using FoundationDB as the underlying storage for a file system offers many advantages, including strong security, high reliability, and easy-to-scale. Our file system layer targets customers who prefer their system to be reliable or when reliability and security is the first concern.
 
----
-
-For more help on markdown, see
-https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet
-
-In particular, you can add images like this (clone the repository to see details):
-
-![alt text](https://github.com/BU-NU-CLOUD-SP18/sample-project/raw/master/cloud.png "Hover text")
+FUSE is a Linux kernel module used to mount userspace programs as Unix-compatible filesystems. The reference implementation can be found at [here](https://github.com/libfuse/libfuse). We plan on using an open source set of Java bindings found at [here](https://github.com/SerCeMan/jnr-fuse).
