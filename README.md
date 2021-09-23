@@ -41,7 +41,7 @@ The actual method we use to map a file/directory structure over a key value stor
 
 The end result should have an architecture similar to the following:
 
-![Image of Diagram](https://imgur.com/a/SBL2aBO)
+![Image of Diagram](Screenshot.png)
 
 ---
 
