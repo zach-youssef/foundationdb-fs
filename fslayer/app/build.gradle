@@ -25,6 +25,9 @@ dependencies {
 
     // FoundationDB Bindings
     implementation 'org.foundationdb:fdb-java:6.3.18'
+
+    // Java Native Runtime FUSE
+    implementation 'com.github.serceman:jnr-fuse:0.5.5'
 }
 
 application {
