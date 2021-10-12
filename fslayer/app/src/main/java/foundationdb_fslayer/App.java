@@ -25,7 +25,8 @@ public class App {
                 return Tuple.fromBytes(result).getString(0);
             });
 
-//            System.out.println("Hello " + hello);
+            // Sysout our result from the DB
+            System.out.println("Hello " + hello);
         } catch (Exception e) {
             e.printStackTrace();
         }
