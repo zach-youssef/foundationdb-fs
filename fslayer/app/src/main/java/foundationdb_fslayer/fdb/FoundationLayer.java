@@ -13,7 +13,7 @@ public class FoundationLayer implements FoundationFileOperations {
 
     @Override
     public String HelloWorld() {
-        String output = "ERROR";
+        String output = " ERROR" ;
         try(Database db = fdb.open()) {
             // Run an operation on the database
             db.run(tr -> {
