@@ -12,8 +12,16 @@ import java.nio.file.Paths;
 public class App {
 
     public static void main(String[] args) {
+        System.out.println("Print...");
         FDB fdb = FDB.selectAPIVersion(630);
         FoundationFileOperations dbOps = new FoundationLayer(fdb);
+
+
+
+        dbOps.write("new_path", " new content");
+
+
+
         FuseLayer fuseLayer = new FuseLayer(dbOps);
 
         try{
@@ -22,6 +30,11 @@ public class App {
             fuseLayer.umount();
         }
     }
+
+    // write test
+
+
+
 }
 
 
