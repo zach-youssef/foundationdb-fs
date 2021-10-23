@@ -14,6 +14,14 @@ public interface FoundationFileOperations {
   String helloWorld();
 
   /**
+   * Read a file.
+   *
+   * @param path file path
+   * @return encoded byte representation of the file content
+   */
+  byte[] read(String path);
+
+  /**
    * Remove an empty directory if exists.
    *
    * @param dir   parent directory

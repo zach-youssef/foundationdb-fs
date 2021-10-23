@@ -21,12 +21,16 @@ public class fdbTest {
     FDB fdb = FDB.selectAPIVersion(630);
     fsLayer = new FoundationLayer(fdb);
     dir = new DirectoryLayer();
-    list = List.of("alpha", "beta", "charlie");
+    list = List.of("alpha", "beta", "charlie"); // dir: alpha/beta/charlie/
   }
 
   @Test
   public void testHelloWorld() {
     assertEquals("Hello jess", fsLayer.helloWorld());
+  }
+
+  @Test
+  public void testRead() {
   }
 
   @Test
@@ -41,9 +45,9 @@ public class fdbTest {
 
   @Test
   public void testLs() {
-    assertEquals("[alpha]", fsLayer.ls(dir, list.subList(0, 0)).toString());
-    assertEquals("[beta]", fsLayer.ls(dir, list.subList(0, 1)).toString());
-    assertEquals("[charlie]", fsLayer.ls(dir, list.subList(0, 2)).toString());
-    assertEquals("[]", fsLayer.ls(dir, list).toString());
+    assertEquals("[alpha]", fsLayer.ls(dir, list.subList(0, 0)).toString()); // ls /
+    assertEquals("[beta]", fsLayer.ls(dir, list.subList(0, 1)).toString()); // ls alpha/
+    assertEquals("[charlie]", fsLayer.ls(dir, list.subList(0, 2)).toString()); // ls alpha/beta/
+    assertEquals("[]", fsLayer.ls(dir, list).toString()); // ls alpha/beta/charlie/
   }
 }

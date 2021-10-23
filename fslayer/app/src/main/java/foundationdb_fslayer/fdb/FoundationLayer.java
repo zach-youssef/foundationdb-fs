@@ -38,6 +38,11 @@ public class FoundationLayer implements FoundationFileOperations {
   }
 
   @Override
+  public byte[] read(String path) {
+    return db.read(tr -> tr.get(Tuple.from(path).pack()).join());
+  }
+
+  @Override
   public boolean rmdir(Directory dir, List<String> paths) {
     try {
       dir.removeIfExists(db, paths).get();
