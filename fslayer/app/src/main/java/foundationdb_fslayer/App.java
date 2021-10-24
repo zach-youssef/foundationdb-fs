@@ -12,17 +12,25 @@ import java.nio.file.Paths;
 
 public class App {
 
+
   public static void main(String[] args) {
     FDB fdb = FDB.selectAPIVersion(630);
     FoundationFileOperations dbOps = new FoundationLayer(fdb);
     FuseLayer fuseLayer = new FuseLayer(dbOps);
+
 
     try {
       fuseLayer.mount(Paths.get("./tmp/mnt_fuse"), true, true);
     } finally {
       fuseLayer.umount();
     }
+
+
+
+
+
   }
+
 }
 
 

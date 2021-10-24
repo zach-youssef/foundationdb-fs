@@ -6,6 +6,12 @@ import java.util.List;
 
 public interface FoundationFileOperations {
 
+    String HelloWorld();
+    void write(String  path, String data);
+
+
+
+
   /**
    * Simple Hello World program to start with.
    *
@@ -47,4 +53,5 @@ public interface FoundationFileOperations {
    * @return a list of strings representing all sub-directories under the current directory
    */
   List<String> ls(Directory dir, List<String> paths);
+
 }
