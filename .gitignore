@@ -1,8 +1,8 @@
 # Ignore Gradle project-specific cache directory
-.gradle
+fslayer/.gradle
 
 # Ignore Gradle build output directory
-build
+fslayer/app/build
 
 # Intellij Files
-.idea/
+.idea
