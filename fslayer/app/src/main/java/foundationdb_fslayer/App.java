@@ -14,20 +14,13 @@ public class App {
 
 
   public static void main(String[] args) {
-    FDB fdb = FDB.selectAPIVersion(630);
-    FoundationFileOperations dbOps = new FoundationLayer(fdb);
+    FoundationFileOperations dbOps = new FoundationLayer(630);
     FuseLayer fuseLayer = new FuseLayer(dbOps);
-
-
     try {
-      fuseLayer.mount(Paths.get("./tmp/mnt_fuse"), true, true);
+      fuseLayer.mount(Paths.get(args[0]), true, true);
     } finally {
       fuseLayer.umount();
     }
-
-
-
-
 
   }
 

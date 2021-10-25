@@ -6,11 +6,7 @@ import java.util.List;
 
 public interface FoundationFileOperations {
 
-    String HelloWorld();
     void write(String  path, String data);
-
-
-
 
   /**
    * Simple Hello World program to start with.
