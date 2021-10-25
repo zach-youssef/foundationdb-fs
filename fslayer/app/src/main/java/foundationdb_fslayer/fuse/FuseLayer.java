@@ -66,6 +66,11 @@ public class FuseLayer extends FuseStubFS {
     return dbOps.mkdir(dir, parsePath(path)) == null ? -ErrorCodes.ENOENT() : 0;
   }
 
+  @Override
+  public int rmdir(String path) {
+    return dbOps.rmdir(dir, parsePath(path)) ? 0 : -ErrorCodes.ENOENT();
+  }
+
   private static List<String> parsePath(String path){
     return Arrays.stream(path.split("/"))
             .filter(str -> !str.equals(""))
