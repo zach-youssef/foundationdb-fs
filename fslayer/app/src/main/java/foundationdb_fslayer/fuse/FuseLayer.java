@@ -11,6 +11,7 @@ import ru.serce.jnrfuse.struct.FuseFileInfo;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class FuseLayer extends FuseStubFS {
 
@@ -26,9 +27,15 @@ public class FuseLayer extends FuseStubFS {
   public int getattr(String path, FileStat stat) {
     int res = 0;
 
-    if (dbOps.ls(dir, Arrays.asList(path.split("/"))) != null){
+    List<String> paths = Arrays.stream(path.split("/"))
+            .filter(str -> !str.equals(""))
+            .collect(Collectors.toList());
+
+    if (dbOps.ls(dir, paths) != null){
       stat.st_mode.set(FileStat.S_IFDIR | 0755);
       stat.st_nlink.set(2);
+    } else {
+      return -ErrorCodes.ENOENT();
     }
 
     return res;
