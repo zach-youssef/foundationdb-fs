@@ -12,8 +12,8 @@ public class FoundationLayer implements FoundationFileOperations {
   private final FDB fdb;
   private final Database db;
 
-  public FoundationLayer(FDB fdb) {
-    this.fdb = fdb;
+  public FoundationLayer(Integer apiVersion) {
+    this.fdb = FDB.selectAPIVersion(apiVersion);
     this.db = fdb.open();
   }
 
