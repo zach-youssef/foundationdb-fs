@@ -27,11 +27,7 @@ public class FuseLayer extends FuseStubFS {
   public int getattr(String path, FileStat stat) {
     int res = 0;
 
-    List<String> paths = Arrays.stream(path.split("/"))
-            .filter(str -> !str.equals(""))
-            .collect(Collectors.toList());
-
-    if (dbOps.ls(dir, paths) != null){
+    if (dbOps.ls(dir, parsePath(path)) != null){
       stat.st_mode.set(FileStat.S_IFDIR | 0755);
       stat.st_nlink.set(2);
     } else {
@@ -53,7 +49,7 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int readdir(String path, Pointer buf, FuseFillDir filter, long offset, FuseFileInfo fi) {
-    List<String> contents = dbOps.ls(dir, Arrays.asList(path.split("/")));
+    List<String> contents = dbOps.ls(dir, parsePath(path));
 
     if (contents != null) {
       filter.apply(buf, ".", null, 0);
@@ -63,5 +59,16 @@ public class FuseLayer extends FuseStubFS {
     }
 
     return 0;
+  }
+
+  @Override
+  public int mkdir(String path, long mode) {
+    return dbOps.mkdir(dir, parsePath(path)) == null ? -ErrorCodes.ENOENT() : 0;
+  }
+
+  private static List<String> parsePath(String path){
+    return Arrays.stream(path.split("/"))
+            .filter(str -> !str.equals(""))
+            .collect(Collectors.toList());
   }
 }
