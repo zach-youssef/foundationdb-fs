@@ -1,7 +1,8 @@
+package foundationdb_fslayer;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import com.apple.foundationdb.FDB;
 import com.apple.foundationdb.directory.Directory;
 import com.apple.foundationdb.directory.DirectoryLayer;
 import foundationdb_fslayer.fdb.FoundationFileOperations;
@@ -18,15 +19,14 @@ public class fdbTest {
 
   @Before
   public void setup() {
-    FDB fdb = FDB.selectAPIVersion(630);
-    fsLayer = new FoundationLayer(fdb);
+    fsLayer = new FoundationLayer(630);
     dir = new DirectoryLayer();
     list = List.of("alpha", "beta", "charlie"); // dir: alpha/beta/charlie/
   }
 
   @Test
   public void testHelloWorld() {
-    assertEquals("Hello jess", fsLayer.helloWorld());
+    assertEquals("world", fsLayer.helloWorld());
   }
 
   @Test
@@ -35,6 +35,8 @@ public class fdbTest {
 
   @Test
   public void testRmdir() {
+    fsLayer.mkdir(dir, list);
+
     assertTrue(fsLayer.rmdir(dir, list.subList(0, 1)));
   }
 
@@ -45,9 +47,13 @@ public class fdbTest {
 
   @Test
   public void testLs() {
+    fsLayer.mkdir(dir, list);
+
     assertEquals("[alpha]", fsLayer.ls(dir, list.subList(0, 0)).toString()); // ls /
     assertEquals("[beta]", fsLayer.ls(dir, list.subList(0, 1)).toString()); // ls alpha/
     assertEquals("[charlie]", fsLayer.ls(dir, list.subList(0, 2)).toString()); // ls alpha/beta/
     assertEquals("[]", fsLayer.ls(dir, list).toString()); // ls alpha/beta/charlie/
+
+    fsLayer.rmdir(dir, list);
   }
 }
