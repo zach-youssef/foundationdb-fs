@@ -5,6 +5,7 @@ import com.apple.foundationdb.FDB;
 import com.apple.foundationdb.directory.Directory;
 import com.apple.foundationdb.directory.DirectorySubspace;
 import com.apple.foundationdb.tuple.Tuple;
+import com.google.common.primitives.Bytes;
 import java.util.List;
 
 public class FoundationLayer implements FoundationFileOperations {
@@ -62,54 +63,27 @@ public class FoundationLayer implements FoundationFileOperations {
   }
 
 
+  @Override
+  public void write(String path, byte[] data) {
 
-    /* Baisc Write operation to write at the end of a file
-    * @param path, path of the file
-    * @param data, content that is appended to the file
-    * If file path does not already exist, file path is created
-    * */
-    @Override
-    public void write(String path, String data) {
-        try(Database db = fdb.open()) {
+    // Read existing value of path from the database
+    byte[] buffer = read(path);
 
-            // Get existing value of path from the database
-            byte[] buffer = db.run(tr -> {
-                byte[] buf = tr.get(Tuple.from(path).pack()).join();
-                return buf;
-            });
-
-            // add data to existing and set to path
-            if(buffer != null) {
-                db.run(tr -> {
-                    String content = Tuple.fromBytes(buffer).getString(0);
-                    tr.set(Tuple.from(path).pack(), Tuple.from( content + data).pack());
-                    return null;
-                });
-            } else {
-                db.run(tr -> {
-                    tr.set(Tuple.from(path).pack(), Tuple.from( data).pack());
-                    return null;
-                });
-            }
-            // For dev use
-            String output = db.run(tr -> {
-                byte[] buf = tr.get(Tuple.from(path).pack()).join();
-                return Tuple.fromBytes(buf).getString(0);
-            });
-            System.out.println(output);
-
-
-
-
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-
-
-
+    // Add data to existing buffer,
+    if(buffer != null) {
+      db.run(tr -> {
+        byte[] content = Bytes.concat(buffer, data);
+        tr.set(Tuple.from(path).pack(),content);
+        return null;
+      });
+    } else {
+      db.run(tr -> {
+        tr.set(Tuple.from(path).pack(), data);
+        return null;
+      });
     }
+  }
+
 
   @Override
   public List<String> ls(Directory dir, List<String> paths) {
@@ -118,6 +92,14 @@ public class FoundationLayer implements FoundationFileOperations {
     } catch (Exception e) {
       return null;
     }
+  }
+
+  public void clearFileContent(String file) {
+    db.run(tr -> {
+      tr.clear(Tuple.from(file).pack());
+      return null;
+    });
+
   }
 
 }

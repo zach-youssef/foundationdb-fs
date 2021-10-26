@@ -5,9 +5,6 @@ import com.apple.foundationdb.directory.DirectorySubspace;
 import java.util.List;
 
 public interface FoundationFileOperations {
-
-    void write(String  path, String data);
-
   /**
    * Simple Hello World program to start with.
    *
@@ -22,6 +19,14 @@ public interface FoundationFileOperations {
    * @return encoded byte representation of the file content
    */
   byte[] read(String path);
+
+  /**
+   * Write to a file
+   *
+   * @param path file path
+   * @param data data to be added to file
+   */
+  void write(String path, byte[] data);
 
   /**
    * Remove an empty directory if exists.
@@ -49,5 +54,12 @@ public interface FoundationFileOperations {
    * @return a list of strings representing all sub-directories under the current directory
    */
   List<String> ls(Directory dir, List<String> paths);
+
+  /**
+   * Clear content of file
+   *
+   * @param file file path
+   */
+  void clearFileContent(String file);
 
 }
