@@ -6,13 +6,6 @@ import java.util.List;
 
 public interface FoundationFileOperations {
   /**
-   * Simple Hello World program to start with.
-   *
-   * @return a string of "hello world"
-   */
-  String helloWorld();
-
-  /**
    * Read a file.
    *
    * @param path file path

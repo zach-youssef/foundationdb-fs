@@ -26,26 +26,6 @@ public class FoundationLayer implements FoundationFileOperations {
   }
 
   @Override
-  public String helloWorld() {
-    try {
-      String hello;
-      // Run an operation on the database
-      db.run(tr -> {
-        tr.set(Tuple.from("hello").pack(), Tuple.from("world").pack());
-        return null;
-      });
-      // Get the value of 'hello' from the database
-      hello = db.run(tr -> {
-        byte[] result = tr.get(Tuple.from("hello").pack()).join();
-        return Tuple.fromBytes(result).getString(0);
-      });
-      return hello;
-    } catch (Exception e) {
-      return null;
-    }
-  }
-
-  @Override
   public byte[] read(String path) {
     List<String> paths = parsePath(path);
     String filename = paths.get(paths.size() - 1);
@@ -109,7 +89,7 @@ public class FoundationLayer implements FoundationFileOperations {
       try {
         DirectorySubspace subspace = new DirectoryLayer().open(tr, dirPath).get();
         tr.set(subspace.pack(filename), content);
-      }catch(Exception e) {
+      } catch(Exception e) {
         System.err.println("Error writing");
         e.printStackTrace();
       }
