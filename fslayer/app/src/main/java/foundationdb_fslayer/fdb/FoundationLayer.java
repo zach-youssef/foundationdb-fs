@@ -2,11 +2,18 @@ package foundationdb_fslayer.fdb;
 
 import com.apple.foundationdb.Database;
 import com.apple.foundationdb.FDB;
+import com.apple.foundationdb.Range;
 import com.apple.foundationdb.directory.Directory;
+import com.apple.foundationdb.directory.DirectoryLayer;
 import com.apple.foundationdb.directory.DirectorySubspace;
 import com.apple.foundationdb.tuple.Tuple;
 import com.google.common.primitives.Bytes;
+
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+
+import static foundationdb_fslayer.Util.parsePath;
 
 public class FoundationLayer implements FoundationFileOperations {
 
@@ -40,7 +47,24 @@ public class FoundationLayer implements FoundationFileOperations {
 
   @Override
   public byte[] read(String path) {
-    return db.read(tr -> tr.get(Tuple.from(path).pack()).join());
+    List<String> paths = parsePath(path);
+    String filename = paths.get(paths.size() - 1);
+    List<String> dirPath = new ArrayList<>(paths);
+    dirPath.remove(filename);
+    try {
+      return db.read(rt -> {
+        try {
+          DirectorySubspace subspace = new DirectoryLayer().open(rt, dirPath).get();
+          return rt.get(subspace.pack(filename));
+        } catch (Exception e){
+          System.err.println("read error");
+          e.printStackTrace();
+          return null;
+        }
+      }).get();
+    } catch (Exception e){
+      return null;
+    }
   }
 
   @Override
@@ -65,30 +89,59 @@ public class FoundationLayer implements FoundationFileOperations {
 
   @Override
   public void write(String path, byte[] data) {
+    List<String> paths = parsePath(path);
+    String filename = paths.get(paths.size() - 1);
+    List<String> dirPath = new ArrayList<>(paths);
+    dirPath.remove(filename);
 
     // Read existing value of path from the database
     byte[] buffer = read(path);
 
-    // Add data to existing buffer,
-    if(buffer != null) {
-      db.run(tr -> {
-        byte[] content = Bytes.concat(buffer, data);
-        tr.set(Tuple.from(path).pack(),content);
-        return null;
-      });
-    } else {
-      db.run(tr -> {
-        tr.set(Tuple.from(path).pack(), data);
-        return null;
-      });
-    }
+    db.run(tr -> {
+      byte[] content;
+      if (buffer != null) {
+        // Add data to existing buffer
+        content = Bytes.concat(buffer, data);
+      } else {
+        content = data;
+      }
+
+      try {
+        DirectorySubspace subspace = new DirectoryLayer().open(tr, dirPath).get();
+        tr.set(subspace.pack(filename), content);
+      }catch(Exception e) {
+        System.err.println("Error writing");
+        e.printStackTrace();
+      }
+      return null;
+    });
   }
 
 
   @Override
   public List<String> ls(Directory dir, List<String> paths) {
     try {
-      return dir.list(db, paths).get();
+      final List<String> contents = new ArrayList<>(dir.list(db, paths).get());
+
+      final List<String> filenames = db.read(readTransaction -> {
+        try {
+          DirectorySubspace subspace = dir.open(db, paths).get();
+          Range keyRange = subspace.range();
+          return readTransaction.getRange(keyRange).asList().get().stream()
+                  .map(kv -> Tuple.fromBytes(kv.getKey()))
+                  .map(t -> t.getString(t.size() - 1))
+                  .collect(Collectors.toList());
+        } catch (Exception e) {
+          e.printStackTrace();
+          return null;
+        }
+      });
+
+      if (filenames != null) {
+        contents.addAll(filenames);
+      }
+
+      return contents;
     } catch (Exception e) {
       return null;
     }
@@ -99,7 +152,5 @@ public class FoundationLayer implements FoundationFileOperations {
       tr.clear(Tuple.from(file).pack());
       return null;
     });
-
   }
-
 }
