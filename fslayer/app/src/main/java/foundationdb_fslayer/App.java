@@ -16,6 +16,7 @@ public class App {
   public static void main(String[] args) {
     FoundationFileOperations dbOps = new FoundationLayer(630);
     FuseLayer fuseLayer = new FuseLayer(dbOps);
+
     try {
       fuseLayer.mount(Paths.get(args[0]), true, true);
     } finally {
