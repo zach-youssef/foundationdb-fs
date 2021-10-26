@@ -148,8 +148,16 @@ public class FoundationLayer implements FoundationFileOperations {
   }
 
   public void clearFileContent(String file) {
+    List<String> paths = parsePath(file);
+    String filename = paths.get(paths.size() - 1);
+    List<String> dirPath = new ArrayList<>(paths);
+    dirPath.remove(filename);
+
     db.run(tr -> {
-      tr.clear(Tuple.from(file).pack());
+      try {
+        DirectorySubspace subspace = new DirectoryLayer().open(tr, dirPath).get();
+        tr.clear(subspace.pack(filename));
+      } catch (Exception e) {e.printStackTrace();}
       return null;
     });
   }

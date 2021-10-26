@@ -127,4 +127,10 @@ public class FuseLayer extends FuseStubFS {
   public int utimens(String path, Timespec[] timespec) {
     return 0;
   }
+
+  @Override
+  public int unlink(String path){
+    dbOps.clearFileContent(path);
+    return 0;
+  }
 }
