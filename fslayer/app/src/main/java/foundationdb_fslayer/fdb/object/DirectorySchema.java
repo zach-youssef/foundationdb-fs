@@ -25,7 +25,14 @@ public class DirectorySchema {
      */
     public List<String> list(Directory dir, ReadTransaction transaction) {
         try {
-            return dir.list(transaction, paths).get();
+            List<String> contents =  dir.list(transaction, paths).get();
+            DirectorySubspace subspace = dir.open(transaction, paths).get();
+            // TODO remove once files are subspaces
+            transaction.getRange(subspace.range()).asList().get().stream()
+                    .map(kv -> Tuple.fromBytes(kv.getKey()))
+                    .map(t -> t.getString(t.size() - 1))
+                    .forEach(contents::add);
+            return contents;
         } catch (Exception e){
             return null;
         }

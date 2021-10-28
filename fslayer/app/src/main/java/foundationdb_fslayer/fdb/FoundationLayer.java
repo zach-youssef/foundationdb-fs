@@ -1,16 +1,16 @@
 package foundationdb_fslayer.fdb;
 
-import com.apple.foundationdb.Database;
-import com.apple.foundationdb.FDB;
-import com.apple.foundationdb.Range;
-import com.apple.foundationdb.directory.Directory;
+import com.apple.foundationdb.*;
 import com.apple.foundationdb.directory.DirectoryLayer;
 import com.apple.foundationdb.directory.DirectorySubspace;
 import com.apple.foundationdb.tuple.Tuple;
-import com.google.common.primitives.Bytes;
+import foundationdb_fslayer.fdb.object.DirectorySchema;
+import foundationdb_fslayer.fdb.object.FileSchema;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static foundationdb_fslayer.Util.parsePath;
@@ -18,127 +18,70 @@ import static foundationdb_fslayer.Util.parsePath;
 public class FoundationLayer implements FoundationFileOperations {
 
   private final FDB fdb;
+  private final DirectoryLayer directoryLayer;
   private final Database db;
 
   public FoundationLayer(Integer apiVersion) {
     this.fdb = FDB.selectAPIVersion(apiVersion);
+    this.directoryLayer = new DirectoryLayer();
     this.db = fdb.open();
+  }
+
+  private <T> T dbRead(Function<ReadTransaction, T> op){
+    return db.read(op);
+  }
+
+  private <T> T dbWrite(Function<Transaction, T> op){
+    return db.run(op);
   }
 
   @Override
   public byte[] read(String path) {
-    List<String> paths = parsePath(path);
-    String filename = paths.get(paths.size() - 1);
-    List<String> dirPath = new ArrayList<>(paths);
-    dirPath.remove(filename);
-    try {
-      return db.read(rt -> {
-        try {
-          DirectorySubspace subspace = new DirectoryLayer().open(rt, dirPath).get();
-          return rt.get(subspace.pack(filename));
-        } catch (Exception e){
-          System.err.println("read error");
-          e.printStackTrace();
-          return null;
-        }
-      }).get();
-    } catch (Exception e){
-      return null;
-    }
+    FileSchema file = new FileSchema(path);
+
+    return dbRead(transaction -> file.read(directoryLayer, transaction));
   }
 
   @Override
-  public boolean rmdir(Directory dir, List<String> paths) {
-    try {
-      dir.removeIfExists(db, paths).get();
-      return true;
-    } catch (Exception e) {
-      return false;
-    }
+  public boolean rmdir(String path) {
+    DirectorySchema dir = new DirectorySchema(path);
+
+    return dbWrite(transaction -> dir.delete(directoryLayer, transaction));
   }
 
   @Override
-  public DirectorySubspace mkdir(Directory dir, List<String> paths) {
-    try {
-      return dir.create(db, paths).get();
-    } catch (Exception e) {
-      return null;
-    }
+  public DirectorySubspace mkdir(String path) {
+    DirectorySchema dir = new DirectorySchema(path);
+
+    return dbWrite(transaction -> dir.create(directoryLayer, transaction));
   }
 
 
   @Override
   public void write(String path, byte[] data) {
-    List<String> paths = parsePath(path);
-    String filename = paths.get(paths.size() - 1);
-    List<String> dirPath = new ArrayList<>(paths);
-    dirPath.remove(filename);
+    FileSchema file = new FileSchema(path);
 
-    // Read existing value of path from the database
-    byte[] buffer = read(path);
-
-    db.run(tr -> {
-      byte[] content;
-      if (buffer != null) {
-        // Add data to existing buffer
-        content = Bytes.concat(buffer, data);
-      } else {
-        content = data;
-      }
-
-      try {
-        DirectorySubspace subspace = new DirectoryLayer().open(tr, dirPath).get();
-        tr.set(subspace.pack(filename), content);
-      } catch(Exception e) {
-        System.err.println("Error writing");
-        e.printStackTrace();
-      }
-      return null;
-    });
+    dbWrite(transaction -> file.write(directoryLayer, transaction, data));
   }
 
 
   @Override
-  public List<String> ls(Directory dir, List<String> paths) {
-    try {
-      final List<String> contents = new ArrayList<>(dir.list(db, paths).get());
-
-      final List<String> filenames = db.read(readTransaction -> {
-        try {
-          DirectorySubspace subspace = dir.open(db, paths).get();
-          Range keyRange = subspace.range();
-          return readTransaction.getRange(keyRange).asList().get().stream()
-                  .map(kv -> Tuple.fromBytes(kv.getKey()))
-                  .map(t -> t.getString(t.size() - 1))
-                  .collect(Collectors.toList());
-        } catch (Exception e) {
-          e.printStackTrace();
-          return null;
-        }
-      });
-
-      if (filenames != null) {
-        contents.addAll(filenames);
+  public List<String> ls(String path) {
+    if ("/".equals(path)){
+      try {
+        return directoryLayer.list(db, new ArrayList<>()).get();
+      } catch (Exception e) {
+        return null;
       }
-
-      return contents;
-    } catch (Exception e) {
-      return null;
     }
+
+    DirectorySchema dir = new DirectorySchema(path);
+
+    return dbRead(transaction -> dir.list(directoryLayer, transaction));
   }
 
-  public void clearFileContent(String file) {
-    List<String> paths = parsePath(file);
-    String filename = paths.get(paths.size() - 1);
-    List<String> dirPath = new ArrayList<>(paths);
-    dirPath.remove(filename);
-
-    db.run(tr -> {
-      try {
-        DirectorySubspace subspace = new DirectoryLayer().open(tr, dirPath).get();
-        tr.clear(subspace.pack(filename));
-      } catch (Exception e) {e.printStackTrace();}
-      return null;
-    });
+  public void clearFileContent(String filepath) {
+    FileSchema file = new FileSchema(filepath);
+    dbWrite(transaction -> file.delete(directoryLayer, transaction));
   }
 }

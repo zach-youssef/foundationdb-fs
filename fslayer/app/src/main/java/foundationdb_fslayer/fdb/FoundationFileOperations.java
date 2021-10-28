@@ -1,6 +1,5 @@
 package foundationdb_fslayer.fdb;
 
-import com.apple.foundationdb.directory.Directory;
 import com.apple.foundationdb.directory.DirectorySubspace;
 import java.util.List;
 
@@ -24,29 +23,26 @@ public interface FoundationFileOperations {
   /**
    * Remove an empty directory if exists.
    *
-   * @param dir   parent directory
-   * @param paths list of path strings
+   * @param path list of path strings
    * @return a boolean value determining whether removing the directory is successful
    */
-  boolean rmdir(Directory dir, List<String> paths);
+  boolean rmdir(String path);
 
   /**
    * Create a new directory matching the provided path under the given directory.
    *
-   * @param dir   parent directory
-   * @param paths list of path strings
+   * @param path list of path strings
    * @return The directory subspace of the newly created directory
    */
-  DirectorySubspace mkdir(Directory dir, List<String> paths);
+  DirectorySubspace mkdir(String path);
 
   /**
    * List all directories under the provided directory.
    *
-   * @param dir   parent directory
-   * @param paths list of path strings
+   * @param path list of path strings
    * @return a list of strings representing all sub-directories under the current directory
    */
-  List<String> ls(Directory dir, List<String> paths);
+  List<String> ls(String path);
 
   /**
    * Clear content of file

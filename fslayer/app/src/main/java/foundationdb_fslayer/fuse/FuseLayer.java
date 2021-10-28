@@ -8,24 +8,19 @@ import ru.serce.jnrfuse.FuseFillDir;
 import ru.serce.jnrfuse.FuseStubFS;
 import ru.serce.jnrfuse.struct.FileStat;
 import ru.serce.jnrfuse.struct.FuseFileInfo;
-import ru.serce.jnrfuse.struct.Statvfs;
 import ru.serce.jnrfuse.struct.Timespec;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static foundationdb_fslayer.Util.parsePath;
 
 public class FuseLayer extends FuseStubFS {
 
   private final FoundationFileOperations dbOps;
-  private final DirectoryLayer dir;
 
   public FuseLayer(FoundationFileOperations dbOps) {
     this.dbOps = dbOps;
-    this.dir = new DirectoryLayer();
   }
 
   @Override
@@ -38,15 +33,11 @@ public class FuseLayer extends FuseStubFS {
       return 0;
     }
 
-    List<String> wholePath = parsePath(path);
-    String objName = wholePath.get(wholePath.size() - 1);
-    List<String> parentPath = new ArrayList<>(wholePath);
-    parentPath.remove(objName);
-
-    if (dbOps.ls(dir, wholePath) != null){
+    if (dbOps.ls(path) != null){
       stat.st_mode.set(FileStat.S_IFDIR | 0755);
       stat.st_nlink.set(2);
-    } else if (dbOps.ls(dir, parentPath).contains(objName)) {
+    } else if (dbOps.ls(path.substring(0, path.lastIndexOf("/")))
+                    .contains(path.substring(path.lastIndexOf("/") + 1))) {
       stat.st_mode.set(FileStat.S_IFREG | 0777);
       stat.st_size.set(1000);
     } else {
@@ -68,7 +59,7 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int readdir(String path, Pointer buf, FuseFillDir filter, long offset, FuseFileInfo fi) {
-    List<String> contents = dbOps.ls(dir, parsePath(path));
+    List<String> contents = dbOps.ls(path);
 
     if (contents != null) {
       filter.apply(buf, ".", null, 0);
@@ -82,12 +73,12 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int mkdir(String path, long mode) {
-    return dbOps.mkdir(dir, parsePath(path)) == null ? -ErrorCodes.ENOENT() : 0;
+    return dbOps.mkdir(path) == null ? -ErrorCodes.ENOENT() : 0;
   }
 
   @Override
   public int rmdir(String path) {
-    return dbOps.rmdir(dir, parsePath(path)) ? 0 : -ErrorCodes.ENOENT();
+    return dbOps.rmdir(path) ? 0 : -ErrorCodes.ENOENT();
   }
 
   @Override
