@@ -4,8 +4,10 @@ import com.apple.foundationdb.*;
 import com.apple.foundationdb.directory.DirectoryLayer;
 import com.apple.foundationdb.directory.DirectorySubspace;
 import com.apple.foundationdb.tuple.Tuple;
+import foundationdb_fslayer.fdb.object.Attr;
 import foundationdb_fslayer.fdb.object.DirectorySchema;
 import foundationdb_fslayer.fdb.object.FileSchema;
+import foundationdb_fslayer.fdb.object.ObjectType;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -83,5 +85,26 @@ public class FoundationLayer implements FoundationFileOperations {
   public void clearFileContent(String filepath) {
     FileSchema file = new FileSchema(filepath);
     dbWrite(transaction -> file.delete(directoryLayer, transaction));
+  }
+
+  @Override
+  public boolean createFile(String path) {
+    FileSchema file = new FileSchema(path);
+    return dbWrite(transaction -> file.create(directoryLayer, transaction));
+  }
+
+  @Override
+  public Attr getAttr(String path) {
+    List<String> paths = parsePath(path);
+    List<String> listDotPath = new ArrayList<>(paths);
+    listDotPath.add(".");
+    ObjectType type = dbRead(rt -> {
+      try {
+        DirectorySubspace subspace = directoryLayer.open(rt, paths).get();
+        return directoryLayer.exists(rt, listDotPath).get() ? ObjectType.DIRECTORY : ObjectType.FILE;
+      } catch (Exception e) {return ObjectType.NOT_FOUND; }
+    });
+
+    return new Attr().setObjectType(type);
   }
 }

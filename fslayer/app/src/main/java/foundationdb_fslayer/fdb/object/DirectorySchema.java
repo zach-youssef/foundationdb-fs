@@ -1,6 +1,5 @@
 package foundationdb_fslayer.fdb.object;
 
-import com.apple.foundationdb.Range;
 import com.apple.foundationdb.ReadTransaction;
 import com.apple.foundationdb.Transaction;
 import com.apple.foundationdb.directory.Directory;
@@ -10,13 +9,19 @@ import foundationdb_fslayer.Util;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class DirectorySchema {
     private final List<String> paths;
+    private final List<String> metadataPath;
 
     public DirectorySchema(String path){
         this.paths = Util.parsePath(path);
+        this.metadataPath = new ArrayList<>(paths);
+        paths.add(Metadata.META_ROOT);
+    }
+
+    private static class Metadata {
+        final static String META_ROOT = ".";
     }
 
     /**
@@ -25,14 +30,7 @@ public class DirectorySchema {
      */
     public List<String> list(Directory dir, ReadTransaction transaction) {
         try {
-            List<String> contents =  dir.list(transaction, paths).get();
-            DirectorySubspace subspace = dir.open(transaction, paths).get();
-            // TODO remove once files are subspaces
-            transaction.getRange(subspace.range()).asList().get().stream()
-                    .map(kv -> Tuple.fromBytes(kv.getKey()))
-                    .map(t -> t.getString(t.size() - 1))
-                    .forEach(contents::add);
-            return contents;
+            return dir.list(transaction, paths).get();
         } catch (Exception e){
             return null;
         }
@@ -45,6 +43,7 @@ public class DirectorySchema {
     public boolean delete(Directory dir, Transaction transaction) {
         try {
             dir.removeIfExists(transaction, paths).get();
+            dir.removeIfExists(transaction, metadataPath).get();
             return true;
         } catch (Exception e) {
             return false;
@@ -58,7 +57,11 @@ public class DirectorySchema {
      */
     public DirectorySubspace create(Directory dir, Transaction transaction) {
         try {
-            return dir.createOrOpen(transaction, paths).get();
+            // Create this directory
+            DirectorySubspace subspace =  dir.createOrOpen(transaction, paths).get();
+            // Create internal metadata subspace
+            dir.createOrOpen(transaction, metadataPath).get();
+            return subspace;
         } catch (Exception e) {
             return null;
         }

@@ -1,6 +1,8 @@
 package foundationdb_fslayer.fdb;
 
 import com.apple.foundationdb.directory.DirectorySubspace;
+import foundationdb_fslayer.fdb.object.Attr;
+
 import java.util.List;
 
 public interface FoundationFileOperations {
@@ -51,4 +53,15 @@ public interface FoundationFileOperations {
    */
   void clearFileContent(String file);
 
+  /**
+   * Creates a new empty file at the given path
+   * returns false on failure
+   */
+  boolean createFile(String path);
+
+
+  /**
+   * Get the attributes of this file or directory
+   */
+  Attr getAttr(String path);
 }

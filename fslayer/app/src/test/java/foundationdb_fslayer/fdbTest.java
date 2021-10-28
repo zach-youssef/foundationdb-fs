@@ -49,6 +49,7 @@ public class fdbTest {
   @Test
   public void testClearFileContent() {
     // Create a file to delete
+    fsLayer.createFile("/junit_test/delete_me");
     fsLayer.write("/junit_test/delete_me", new byte[1]);
 
     // Delete the file
@@ -62,6 +63,7 @@ public class fdbTest {
   public void testWrite() {
     // create new file
     String filePath = "/junit_test/file";
+    fsLayer.createFile(filePath);
 
     // Write to file
     String startPhrase = "start writing to file";
@@ -107,7 +109,9 @@ public class fdbTest {
     // Create some files
     List<String> filenames = Arrays.asList("a.txt", "b.png", "c.mp4");
     for (String filename : filenames) {
-      fsLayer.write(testPath + "/" + filename, new byte[1]);
+      String filepath = testPath + "/" + filename;
+      fsLayer.createFile(filepath);
+      fsLayer.write(filepath, new byte[1]);
     }
 
     // Call ls

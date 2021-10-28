@@ -2,6 +2,7 @@ package foundationdb_fslayer.fuse;
 
 import com.apple.foundationdb.directory.DirectoryLayer;
 import foundationdb_fslayer.fdb.FoundationFileOperations;
+import foundationdb_fslayer.fdb.object.Attr;
 import jnr.ffi.Pointer;
 import ru.serce.jnrfuse.ErrorCodes;
 import ru.serce.jnrfuse.FuseFillDir;
@@ -33,15 +34,19 @@ public class FuseLayer extends FuseStubFS {
       return 0;
     }
 
-    if (dbOps.ls(path) != null){
-      stat.st_mode.set(FileStat.S_IFDIR | 0755);
-      stat.st_nlink.set(2);
-    } else if (dbOps.ls(path.substring(0, path.lastIndexOf("/")))
-                    .contains(path.substring(path.lastIndexOf("/") + 1))) {
-      stat.st_mode.set(FileStat.S_IFREG | 0777);
-      stat.st_size.set(1000);
-    } else {
-      return -ErrorCodes.ENOENT();
+    Attr attr = dbOps.getAttr(path);
+
+    switch (attr.getObjectType()) {
+      case FILE:
+        stat.st_mode.set(FileStat.S_IFREG | 0777);
+        stat.st_size.set(1000);
+        break;
+      case DIRECTORY:
+        stat.st_mode.set(FileStat.S_IFDIR | 0755);
+        stat.st_nlink.set(2);
+        break;
+      case NOT_FOUND:
+        return -ErrorCodes.ENOENT();
     }
 
     return res;
@@ -110,8 +115,7 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int mknod(String path, long mode, long rdev) {
-    dbOps.write(path, new byte[1]);
-    return 0;
+    return dbOps.createFile(path) ? 0 : -ErrorCodes.ENOENT();
   }
 
   @Override
