@@ -118,17 +118,18 @@ public class FileSchema {
     public boolean delete(DirectoryLayer directoryLayer, Transaction transaction) {
         try {
             // Load the chunk space to delete all the chunks
-            DirectorySubspace chunkSpace = directoryLayer.open(transaction, chunksPath).get();
+            DirectorySubspace chunkSpace = directoryLayer.createOrOpen(transaction, chunksPath).get();
             transaction.clear(chunkSpace.range());
             // Delete the chunk space itself
-            chunkSpace.remove(transaction);
+            directoryLayer.removeIfExists(transaction, chunksPath).get();
             // Load the file space to delete the metadata entries
-            DirectorySubspace fileSpace = directoryLayer.open(transaction, path).get();
+            DirectorySubspace fileSpace = directoryLayer.createOrOpen(transaction, path).get();
             transaction.clear(fileSpace.range());
             // Delete the file space itself
-            fileSpace.remove(transaction);
+            directoryLayer.removeIfExists(transaction, path).get();
             return true;
         } catch (Exception e) {
+            e.printStackTrace();
             return false;
         }
     }
