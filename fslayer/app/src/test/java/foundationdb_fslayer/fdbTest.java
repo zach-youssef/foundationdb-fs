@@ -36,6 +36,7 @@ public class fdbTest {
   @Test
   public void testRead() {
     // Write some data to test read
+    fsLayer.createFile("/junit_test/hello");
     fsLayer.write("/junit_test/hello", "world".getBytes());
 
     // Assert the read is correct
