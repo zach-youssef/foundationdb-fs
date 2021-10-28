@@ -69,17 +69,11 @@ public class FoundationLayer implements FoundationFileOperations {
 
   @Override
   public List<String> ls(String path) {
-    if ("/".equals(path)){
-      try {
-        return directoryLayer.list(db, new ArrayList<>()).get();
-      } catch (Exception e) {
-        return null;
-      }
+    try {
+      return directoryLayer.list(db, parsePath(path)).get();
+    } catch (Exception e) {
+      return null;
     }
-
-    DirectorySchema dir = new DirectorySchema(path);
-
-    return dbRead(transaction -> dir.list(directoryLayer, transaction));
   }
 
   public void clearFileContent(String filepath) {
@@ -97,10 +91,10 @@ public class FoundationLayer implements FoundationFileOperations {
   public Attr getAttr(String path) {
     List<String> paths = parsePath(path);
     List<String> listDotPath = new ArrayList<>(paths);
-    listDotPath.add(".");
+    listDotPath.add(DirectorySchema.Metadata.META_ROOT);
     ObjectType type = dbRead(rt -> {
       try {
-        DirectorySubspace subspace = directoryLayer.open(rt, paths).get();
+        directoryLayer.open(rt, paths).get();
         return directoryLayer.exists(rt, listDotPath).get() ? ObjectType.DIRECTORY : ObjectType.FILE;
       } catch (Exception e) {return ObjectType.NOT_FOUND; }
     });

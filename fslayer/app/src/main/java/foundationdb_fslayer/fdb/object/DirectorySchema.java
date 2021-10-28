@@ -4,11 +4,11 @@ import com.apple.foundationdb.ReadTransaction;
 import com.apple.foundationdb.Transaction;
 import com.apple.foundationdb.directory.Directory;
 import com.apple.foundationdb.directory.DirectorySubspace;
-import com.apple.foundationdb.tuple.Tuple;
 import foundationdb_fslayer.Util;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class DirectorySchema {
     private final List<String> paths;
@@ -20,8 +20,8 @@ public class DirectorySchema {
         paths.add(Metadata.META_ROOT);
     }
 
-    private static class Metadata {
-        final static String META_ROOT = ".";
+    public static class Metadata {
+        public final static String META_ROOT = ".";
     }
 
     /**
@@ -30,8 +30,11 @@ public class DirectorySchema {
      */
     public List<String> list(Directory dir, ReadTransaction transaction) {
         try {
-            return dir.list(transaction, paths).get();
+            return dir.list(transaction, paths).get().stream()
+                    .filter(str-> !str.equals(Metadata.META_ROOT))
+                    .collect(Collectors.toList());
         } catch (Exception e){
+            System.err.printf("LS Err %s%n", String.join("/", paths));
             return null;
         }
     }
