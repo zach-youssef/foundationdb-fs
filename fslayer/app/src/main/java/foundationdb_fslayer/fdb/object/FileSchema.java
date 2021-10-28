@@ -132,4 +132,42 @@ public class FileSchema {
             return false;
         }
     }
+
+    public Attr getMetadata(DirectoryLayer directoryLayer, ReadTransaction transaction) {
+        Attr attr = new Attr().setObjectType(ObjectType.FILE);
+
+        try {
+            DirectorySubspace fileSpace = directoryLayer.open(transaction, path).get();
+            List<KeyValue> metadata = transaction.getRange(fileSpace.range()).asList().get();
+
+            for (KeyValue kv : metadata) {
+                String key = fileSpace.unpack(kv.getKey()).getString(0);
+                Tuple value = Tuple.fromBytes(kv.getValue());
+                switch (key) {
+                    case Metadata.TIMESTAMP:
+                        attr = attr.setTimestamp(value.getLong(0));
+                    default:
+                        break;
+                }
+            }
+        } catch (Exception ignored){}
+
+        return attr;
+    }
+
+    /**
+     * Set the timestamp on this file
+     * Returns false if fails
+     */
+    public boolean setTimestamp(DirectoryLayer directoryLayer, Transaction transaction, long unixTimeSeconds) {
+        try {
+            DirectorySubspace fileSpace = directoryLayer.open(transaction, path).get();
+            transaction.set(fileSpace.pack(Metadata.TIMESTAMP), Tuple.from(unixTimeSeconds).pack());
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+
 }

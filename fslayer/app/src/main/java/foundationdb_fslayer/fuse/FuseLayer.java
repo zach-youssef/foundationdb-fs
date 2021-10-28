@@ -4,6 +4,7 @@ import com.apple.foundationdb.directory.DirectoryLayer;
 import foundationdb_fslayer.fdb.FoundationFileOperations;
 import foundationdb_fslayer.fdb.object.Attr;
 import jnr.ffi.Pointer;
+import jnr.ffi.types.time_t;
 import ru.serce.jnrfuse.ErrorCodes;
 import ru.serce.jnrfuse.FuseFillDir;
 import ru.serce.jnrfuse.FuseStubFS;
@@ -120,7 +121,7 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int utimens(String path, Timespec[] timespec) {
-    return 0;
+    return dbOps.setFileTime(timespec[0].tv_sec.get(), path) ? 0 : -ErrorCodes.ENOENT();
   }
 
   @Override

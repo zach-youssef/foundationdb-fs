@@ -3,17 +3,14 @@ package foundationdb_fslayer.fdb;
 import com.apple.foundationdb.*;
 import com.apple.foundationdb.directory.DirectoryLayer;
 import com.apple.foundationdb.directory.DirectorySubspace;
-import com.apple.foundationdb.tuple.Tuple;
 import foundationdb_fslayer.fdb.object.Attr;
 import foundationdb_fslayer.fdb.object.DirectorySchema;
 import foundationdb_fslayer.fdb.object.FileSchema;
 import foundationdb_fslayer.fdb.object.ObjectType;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static foundationdb_fslayer.Util.parsePath;
 
@@ -92,13 +89,22 @@ public class FoundationLayer implements FoundationFileOperations {
     List<String> paths = parsePath(path);
     List<String> listDotPath = new ArrayList<>(paths);
     listDotPath.add(DirectorySchema.Metadata.META_ROOT);
-    ObjectType type = dbRead(rt -> {
+
+    return dbRead(rt -> {
       try {
         directoryLayer.open(rt, paths).get();
-        return directoryLayer.exists(rt, listDotPath).get() ? ObjectType.DIRECTORY : ObjectType.FILE;
-      } catch (Exception e) {return ObjectType.NOT_FOUND; }
+        if (directoryLayer.exists(rt, listDotPath).get()) {
+          return new DirectorySchema(path).getMetadata(directoryLayer, rt);
+        } else {
+          return new FileSchema(path).getMetadata(directoryLayer, rt);
+        }
+      } catch (Exception e) {return new Attr().setObjectType(ObjectType.NOT_FOUND); }
     });
+  }
 
-    return new Attr().setObjectType(type);
+  @Override
+  public boolean setFileTime(Long timestamp, String path) {
+    return dbWrite(tr ->
+            new FileSchema(path).setTimestamp(directoryLayer, tr, timestamp));
   }
 }

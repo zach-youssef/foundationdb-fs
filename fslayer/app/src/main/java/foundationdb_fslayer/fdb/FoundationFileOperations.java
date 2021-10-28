@@ -64,4 +64,9 @@ public interface FoundationFileOperations {
    * Get the attributes of this file or directory
    */
   Attr getAttr(String path);
+
+  /**
+   * Set the time on a file
+   */
+  boolean setFileTime(Long timestamp, String path);
 }

@@ -3,6 +3,7 @@ package foundationdb_fslayer.fdb.object;
 import com.apple.foundationdb.ReadTransaction;
 import com.apple.foundationdb.Transaction;
 import com.apple.foundationdb.directory.Directory;
+import com.apple.foundationdb.directory.DirectoryLayer;
 import com.apple.foundationdb.directory.DirectorySubspace;
 import foundationdb_fslayer.Util;
 
@@ -18,6 +19,11 @@ public class DirectorySchema {
         this.paths = Util.parsePath(path);
         this.metadataPath = new ArrayList<>(paths);
         paths.add(Metadata.META_ROOT);
+    }
+
+    public Attr getMetadata(DirectoryLayer directoryLayer, ReadTransaction rt) {
+        // TODO
+        return new Attr().setObjectType(ObjectType.DIRECTORY);
     }
 
     public static class Metadata {
