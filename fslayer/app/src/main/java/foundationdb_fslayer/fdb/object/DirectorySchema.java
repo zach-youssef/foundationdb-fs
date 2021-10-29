@@ -9,7 +9,6 @@ import foundationdb_fslayer.Util;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class DirectorySchema {
     private final List<String> paths;
@@ -28,21 +27,6 @@ public class DirectorySchema {
 
     public static class Metadata {
         public final static String META_ROOT = ".";
-    }
-
-    /**
-     *  Returns the list of file and directory names contained within this directory.
-     *  Will return null if this directory does not exist in the database.
-     */
-    public List<String> list(Directory dir, ReadTransaction transaction) {
-        try {
-            return dir.list(transaction, paths).get().stream()
-                    .filter(str-> !str.equals(Metadata.META_ROOT))
-                    .collect(Collectors.toList());
-        } catch (Exception e){
-            System.err.printf("LS Err %s%n", String.join("/", paths));
-            return null;
-        }
     }
 
     /**
