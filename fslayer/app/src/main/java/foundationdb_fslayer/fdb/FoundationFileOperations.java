@@ -20,7 +20,7 @@ public interface FoundationFileOperations {
    * @param path file path
    * @param data data to be added to file
    */
-  void write(String path, byte[] data);
+  void write(String path, byte[] data, long offset);
 
   /**
    * Remove an empty directory if exists.
@@ -69,4 +69,6 @@ public interface FoundationFileOperations {
    * Set the time on a file
    */
   boolean setFileTime(Long timestamp, String path);
+
+  int getFileSize(String path);
 }

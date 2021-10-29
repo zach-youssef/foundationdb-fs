@@ -57,10 +57,10 @@ public class FoundationLayer implements FoundationFileOperations {
 
 
   @Override
-  public void write(String path, byte[] data) {
+  public void write(String path, byte[] data, long offset) {
     FileSchema file = new FileSchema(path);
 
-    dbWrite(transaction -> file.write(directoryLayer, transaction, data));
+    dbWrite(transaction -> file.write(directoryLayer, transaction, data, offset));
   }
 
 
@@ -106,5 +106,10 @@ public class FoundationLayer implements FoundationFileOperations {
   public boolean setFileTime(Long timestamp, String path) {
     return dbWrite(tr ->
             new FileSchema(path).setTimestamp(directoryLayer, tr, timestamp));
+  }
+
+  @Override
+  public int getFileSize(String path) {
+    return dbRead(rt -> new FileSchema(path).size(directoryLayer, rt));
   }
 }

@@ -40,7 +40,7 @@ public class FuseLayer extends FuseStubFS {
     switch (attr.getObjectType()) {
       case FILE:
         stat.st_mode.set(FileStat.S_IFREG | 0777);
-        stat.st_size.set(1000);
+        stat.st_size.set(dbOps.getFileSize(path));
         break;
       case DIRECTORY:
         stat.st_mode.set(FileStat.S_IFDIR | 0755);
@@ -109,7 +109,7 @@ public class FuseLayer extends FuseStubFS {
     byte[] data = new byte[(int) size];
     buf.get(0, data, 0, (int) size);
 
-    dbOps.write(path, data);
+    dbOps.write(path, data, offset);
 
     return (int) size;
   }

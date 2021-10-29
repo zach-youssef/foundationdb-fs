@@ -37,7 +37,7 @@ public class fdbTest {
   public void testRead() {
     // Write some data to test read
     fsLayer.createFile("/junit_test/hello");
-    fsLayer.write("/junit_test/hello", "world".getBytes());
+    fsLayer.write("/junit_test/hello", "world".getBytes(), 0);
 
     // Assert the read is correct
     assertEquals("world", new String(fsLayer.read("/junit_test/hello")));
@@ -51,7 +51,7 @@ public class fdbTest {
   public void testClearFileContent() {
     // Create a file to delete
     fsLayer.createFile("/junit_test/delete_me");
-    fsLayer.write("/junit_test/delete_me", new byte[1]);
+    fsLayer.write("/junit_test/delete_me", new byte[1], 0);
 
     // Delete the file
     fsLayer.clearFileContent("/junit_test/delete_me");
@@ -68,13 +68,14 @@ public class fdbTest {
 
     // Write to file
     String startPhrase = "start writing to file";
-    fsLayer.write(filePath, startPhrase.getBytes(StandardCharsets.UTF_8));
+    byte[] startPhraseBytes = startPhrase.getBytes(StandardCharsets.UTF_8);
+    fsLayer.write(filePath, startPhraseBytes, 0);
     // Verify the output
     assertEquals(startPhrase, new String(fsLayer.read(filePath)));
 
     // continue writing to file
     String continuePhrase = " Continue writing to file";
-    fsLayer.write(filePath, continuePhrase.getBytes(StandardCharsets.UTF_8));
+    fsLayer.write(filePath, continuePhrase.getBytes(StandardCharsets.UTF_8), startPhraseBytes.length);
     String fileContent = startPhrase + continuePhrase;
     // Verify the new string has been appended
     assertEquals(fileContent, new String(fsLayer.read(filePath)));
@@ -112,7 +113,7 @@ public class fdbTest {
     for (String filename : filenames) {
       String filepath = testPath + "/" + filename;
       fsLayer.createFile(filepath);
-      fsLayer.write(filepath, new byte[1]);
+      fsLayer.write(filepath, new byte[1],0);
     }
 
     // Call ls
