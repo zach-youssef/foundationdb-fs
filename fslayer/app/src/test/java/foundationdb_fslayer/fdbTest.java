@@ -1,18 +1,12 @@
 package foundationdb_fslayer;
 
-import com.apple.foundationdb.directory.Directory;
-import com.apple.foundationdb.directory.DirectoryLayer;
-import com.apple.foundationdb.directory.DirectorySubspace;
-import com.apple.foundationdb.tuple.Tuple;
 import foundationdb_fslayer.fdb.FoundationFileOperations;
 import foundationdb_fslayer.fdb.FoundationLayer;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
@@ -21,32 +15,29 @@ import static org.junit.Assert.*;
 public class fdbTest {
 
   private FoundationFileOperations fsLayer;
-  private Directory dir;
-  private List<String> testDirPath;
+  private static final String testPath = "/junit_test";
 
   @Before
   public void setup() {
     fsLayer = new FoundationLayer(630);
-    dir = new DirectoryLayer();
-    testDirPath = new ArrayList<>();
-    testDirPath.add("junit_test");
   }
 
   @BeforeEach
   public void prepareTest() {
-    fsLayer.rmdir(dir, testDirPath);
-    fsLayer.mkdir(dir, testDirPath);
+    fsLayer.rmdir(testPath);
+    fsLayer.mkdir(testPath);
   }
 
   @AfterEach
   public void cleanup() {
-    fsLayer.rmdir(dir, testDirPath);
+    fsLayer.rmdir(testPath);
   }
 
   @Test
   public void testRead() {
     // Write some data to test read
-    fsLayer.write("/junit_test/hello", "world".getBytes());
+    fsLayer.createFile("/junit_test/hello");
+    fsLayer.write("/junit_test/hello", "world".getBytes(), 0);
 
     // Assert the read is correct
     assertEquals("world", new String(fsLayer.read("/junit_test/hello")));
@@ -59,7 +50,8 @@ public class fdbTest {
   @Test
   public void testClearFileContent() {
     // Create a file to delete
-    fsLayer.write("/junit_test/delete_me", new byte[1]);
+    fsLayer.createFile("/junit_test/delete_me");
+    fsLayer.write("/junit_test/delete_me", new byte[1], 0);
 
     // Delete the file
     fsLayer.clearFileContent("/junit_test/delete_me");
@@ -72,16 +64,18 @@ public class fdbTest {
   public void testWrite() {
     // create new file
     String filePath = "/junit_test/file";
+    fsLayer.createFile(filePath);
 
     // Write to file
     String startPhrase = "start writing to file";
-    fsLayer.write(filePath, startPhrase.getBytes(StandardCharsets.UTF_8));
+    byte[] startPhraseBytes = startPhrase.getBytes(StandardCharsets.UTF_8);
+    fsLayer.write(filePath, startPhraseBytes, 0);
     // Verify the output
     assertEquals(startPhrase, new String(fsLayer.read(filePath)));
 
     // continue writing to file
     String continuePhrase = " Continue writing to file";
-    fsLayer.write(filePath, continuePhrase.getBytes(StandardCharsets.UTF_8));
+    fsLayer.write(filePath, continuePhrase.getBytes(StandardCharsets.UTF_8), startPhraseBytes.length);
     String fileContent = startPhrase + continuePhrase;
     // Verify the new string has been appended
     assertEquals(fileContent, new String(fsLayer.read(filePath)));
@@ -91,20 +85,19 @@ public class fdbTest {
   @Test
   public void testRmdir() {
     // Verify deletion is successful
-    assertTrue(fsLayer.rmdir(dir, testDirPath));
+    assertTrue(fsLayer.rmdir(testPath));
     // Verify the directory is actually deleted
-    assertNull(fsLayer.ls(dir, testDirPath));
+    assertNull(fsLayer.ls(testPath));
   }
 
   @Test
   public void testMkdir() {
     // Create a new directory
-    List<String> newPath = new ArrayList<>(testDirPath);
-    newPath.add("mkdir");
-    fsLayer.mkdir(dir, newPath);
+    String newPath = testPath + "/mkdir";
+    fsLayer.mkdir(newPath);
 
     // Verify the new directory exists
-    assertNotNull(fsLayer.ls(dir, newPath));
+    assertNotNull(fsLayer.ls(newPath));
   }
 
   @Test
@@ -112,19 +105,19 @@ public class fdbTest {
     // Create some subdirectories
     List<String> subDirNames = Arrays.asList("alpha", "bravo", "charlie");
     for (String subDirName : subDirNames){
-      List<String> path = new ArrayList<>(testDirPath);
-      path.add(subDirName);
-      fsLayer.mkdir(dir, path);
+      fsLayer.mkdir(testPath + "/" + subDirName);
     }
 
     // Create some files
     List<String> filenames = Arrays.asList("a.txt", "b.png", "c.mp4");
     for (String filename : filenames) {
-      fsLayer.write("/junit_test/" + filename, new byte[1]);
+      String filepath = testPath + "/" + filename;
+      fsLayer.createFile(filepath);
+      fsLayer.write(filepath, new byte[1],0);
     }
 
     // Call ls
-    List<String> lsOut = fsLayer.ls(dir, testDirPath);
+    List<String> lsOut = fsLayer.ls(testPath);
 
     // Verify all the created items are present
     filenames.forEach(filename -> assertTrue(lsOut.contains(filename)));

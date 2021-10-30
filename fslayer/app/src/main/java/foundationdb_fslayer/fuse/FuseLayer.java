@@ -2,30 +2,27 @@ package foundationdb_fslayer.fuse;
 
 import com.apple.foundationdb.directory.DirectoryLayer;
 import foundationdb_fslayer.fdb.FoundationFileOperations;
+import foundationdb_fslayer.fdb.object.Attr;
 import jnr.ffi.Pointer;
+import jnr.ffi.types.time_t;
 import ru.serce.jnrfuse.ErrorCodes;
 import ru.serce.jnrfuse.FuseFillDir;
 import ru.serce.jnrfuse.FuseStubFS;
 import ru.serce.jnrfuse.struct.FileStat;
 import ru.serce.jnrfuse.struct.FuseFileInfo;
-import ru.serce.jnrfuse.struct.Statvfs;
 import ru.serce.jnrfuse.struct.Timespec;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static foundationdb_fslayer.Util.parsePath;
 
 public class FuseLayer extends FuseStubFS {
 
   private final FoundationFileOperations dbOps;
-  private final DirectoryLayer dir;
 
   public FuseLayer(FoundationFileOperations dbOps) {
     this.dbOps = dbOps;
-    this.dir = new DirectoryLayer();
   }
 
   @Override
@@ -38,19 +35,19 @@ public class FuseLayer extends FuseStubFS {
       return 0;
     }
 
-    List<String> wholePath = parsePath(path);
-    String objName = wholePath.get(wholePath.size() - 1);
-    List<String> parentPath = new ArrayList<>(wholePath);
-    parentPath.remove(objName);
+    Attr attr = dbOps.getAttr(path);
 
-    if (dbOps.ls(dir, wholePath) != null){
-      stat.st_mode.set(FileStat.S_IFDIR | 0755);
-      stat.st_nlink.set(2);
-    } else if (dbOps.ls(dir, parentPath).contains(objName)) {
-      stat.st_mode.set(FileStat.S_IFREG | 0777);
-      stat.st_size.set(1000);
-    } else {
-      return -ErrorCodes.ENOENT();
+    switch (attr.getObjectType()) {
+      case FILE:
+        stat.st_mode.set(FileStat.S_IFREG | 0777);
+        stat.st_size.set(dbOps.getFileSize(path));
+        break;
+      case DIRECTORY:
+        stat.st_mode.set(FileStat.S_IFDIR | 0755);
+        stat.st_nlink.set(2);
+        break;
+      case NOT_FOUND:
+        return -ErrorCodes.ENOENT();
     }
 
     return res;
@@ -68,7 +65,7 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int readdir(String path, Pointer buf, FuseFillDir filter, long offset, FuseFileInfo fi) {
-    List<String> contents = dbOps.ls(dir, parsePath(path));
+    List<String> contents = dbOps.ls(path);
 
     if (contents != null) {
       filter.apply(buf, ".", null, 0);
@@ -82,12 +79,12 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int mkdir(String path, long mode) {
-    return dbOps.mkdir(dir, parsePath(path)) == null ? -ErrorCodes.ENOENT() : 0;
+    return dbOps.mkdir(path) == null ? -ErrorCodes.ENOENT() : 0;
   }
 
   @Override
   public int rmdir(String path) {
-    return dbOps.rmdir(dir, parsePath(path)) ? 0 : -ErrorCodes.ENOENT();
+    return dbOps.rmdir(path) ? 0 : -ErrorCodes.ENOENT();
   }
 
   @Override
@@ -112,20 +109,19 @@ public class FuseLayer extends FuseStubFS {
     byte[] data = new byte[(int) size];
     buf.get(0, data, 0, (int) size);
 
-    dbOps.write(path, data);
+    dbOps.write(path, data, offset);
 
     return (int) size;
   }
 
   @Override
   public int mknod(String path, long mode, long rdev) {
-    dbOps.write(path, new byte[1]);
-    return 0;
+    return dbOps.createFile(path) ? 0 : -ErrorCodes.ENOENT();
   }
 
   @Override
   public int utimens(String path, Timespec[] timespec) {
-    return 0;
+    return dbOps.setFileTime(timespec[0].tv_sec.get(), path) ? 0 : -ErrorCodes.ENOENT();
   }
 
   @Override
