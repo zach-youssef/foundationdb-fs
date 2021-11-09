@@ -9,14 +9,23 @@ import com.apple.foundationdb.tuple.Tuple;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.*;
+import java.util.Map;
+import java.util.Set;
+
 
 import static foundationdb_fslayer.Util.parsePath;
 
 public class FileSchema {
     private final List<String> path;
     private final List<String> chunksPath;
+    private List<Integer> free_fds = new ArrayList<Integer>(100);
+    // deafult file descriptor
+    private int next_free_fd = 0;
 
     public final static int CHUNK_SIZE_BYTES = 1000;
+    public final static int MAX_OPEN_FILES = 100;
+    public final static int DEFAULT_REF_COUNTER = 1;
 
     private static class Metadata {
         final static String CHUNKS = "CHUNKS";
@@ -29,6 +38,14 @@ public class FileSchema {
         this.chunksPath = new ArrayList<>(this.path);
         this.chunksPath.add(Metadata.CHUNKS);
     }
+
+    /**
+     * key, value: file descriptor, file handle
+     * MAX_OPEN_FILEs = 100
+     * todo: this can be a class if needed, add methods find, remove, insert
+     */
+    private ConcurrentHashMap<Integer, FileHandle> OpenFilesCache = new ConcurrentHashMap<Integer, FileHandle>(MAX_OPEN_FILES);
+
 
     /**
      * Create the subspace to store this file
@@ -216,6 +233,107 @@ public class FileSchema {
             return false;
         }
     }
+
+
+    /**
+     * open file creates and updates reference counter for the file
+     * @param filename, key in fdb
+     * @param flags argument controls how the file is to be opened.
+     *              eg: O_Append, O_RDONLY, O_WRONLY, O_RDWR, O_CREAT
+     * todo: mode for inode could be passed as an argument
+     *
+     * @return The normal return value from open is a non negative file descriptor
+     * in case of an error, a value of -1 is returned instead
+     */
+    //TODO: add fd to read and write
+    //TODO: add flags to file handle
+    public int open(String filename, int flags) {
+        // validate flags, ignore for now
+            // O_CREAT -> create new file, error if O_CREATE for an existing file
+            // return -1, if invalid flags
+
+        // look for file in open files
+
+        Set<Map.Entry<Integer, FileHandle>> set = OpenFilesCache.entrySet();
+        for(Map.Entry<Integer, FileHandle> it: set) {
+            FileHandle fh = it.getValue();
+            if(filename == fh.getFilename()) {
+                // update reference counter
+                int refCtr = fh.getReferenceCounter();
+                if(refCtr >= 0) {
+                    // update reference counter for file
+                    fh.setReferenceCounter(refCtr++);
+                    it.setValue(fh);
+                    // return existing file descriptor for
+                    return it.getKey();
+                }
+            }
+        }
+        // file not present in OpenFilesCache
+        // create new file handle with default reference counter
+        FileHandle new_fh = new FileHandle(filename, DEFAULT_REF_COUNTER);
+        // generate new file descriptor
+        int fd = getFreeFD();
+        // if fd -> -1, Error: Too many files currently open
+        if(fd > -1) {
+            OpenFilesCache.put(fd, new_fh);
+        }
+
+        return fd;
+
+    }
+
+    /**
+     *
+     * @return next free file descriptor
+     */
+    private int getFreeFD() {
+        int fi;
+        int size = free_fds.size();
+
+        if(size > 0) {
+           fi = free_fds.get(size -1);
+           free_fds.remove(size - 1);
+           return fi;
+        }
+        if(next_free_fd == MAX_OPEN_FILES) {
+            // ERROR: too many files open
+            return -1;
+        } else {
+            fi = next_free_fd;
+            ++next_free_fd;
+            return fi;
+        }
+
+    }
+
+
+    /**
+     * The method close closes the file descriptor filedes.
+     * The file descriptor is deallocated
+     * @param  filedes
+     * @return the normal return value from close is 0; a value of -1 is returned in case of failure.
+     */
+    public int close(int filedes) {
+
+        // mutex.acquire()
+        // remove from openFilesCache
+        boolean status = OpenFilesCache.containsKey(filedes);
+        if(!status) {
+            // ERROR: Given file des does not match
+            return -1;
+        }
+        // remove from OpenFilesCache
+        OpenFilesCache.remove(filedes);
+        // add to free fds
+        free_fds.add(filedes);
+
+        // mutex.release()
+        //success
+        return 0;
+    }
+
+
 
 
 }
