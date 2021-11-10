@@ -54,25 +54,35 @@ public class FileSchema {
      * Reads the current value of the file.
      * Will return null on error.
      */
-    public byte[] read(DirectoryLayer dir, ReadTransaction transaction){
+    public byte[] read(DirectoryLayer dir, ReadTransaction transaction, long offset, long size) {
         try {
             // Open the file's chunk space
             DirectorySubspace chunkSpace = dir.open(transaction, chunksPath).get();
 
-            // Grab all the file's data
-            List<KeyValue> chunks = transaction.getRange(chunkSpace.range()).asList().get();
-
+            // Grab all the relevant chunks of the file
+            int startChunk = (int) (offset / CHUNK_SIZE_BYTES);
+            int endChunk = (int) ((offset + size) / CHUNK_SIZE_BYTES);
+            List<KeyValue> chunks = transaction
+                    .getRange(chunkSpace.pack(startChunk), chunkSpace.pack(endChunk))
+                    .asList().get();
 
             // Initialize buffer to store file
-            byte[] data = new byte[this.size(dir, transaction)];
+            byte[] data = new byte[(int) Math.min(this.size(dir, transaction) - offset, size)];
+            int dataIndex = 0;
 
-            // Grab all the chunks from the database and copy them into the buffer
-            int index = 0;
-            for (KeyValue kv: chunks) {
-                for (byte b : kv.getValue()) {
-                    data[index++] = b;
+            for (KeyValue chunk : chunks) {
+                int copyIndex = 0;
+                if (chunkSpace.unpack(chunk.getKey()).get(0).equals(startChunk)) {
+                    // If this is the first chunk, make sure we start at the offset
+                    copyIndex += offset % CHUNK_SIZE_BYTES;
+                }
+                byte[] chunkData = chunk.getValue();
+                // Copy the data from the chunk into the return buffer
+                for (; copyIndex < chunkData.length && dataIndex < data.length; copyIndex++){
+                    data[dataIndex++] = chunkData[copyIndex];
                 }
             }
+
             return data;
         } catch (Exception e) {
             return null;

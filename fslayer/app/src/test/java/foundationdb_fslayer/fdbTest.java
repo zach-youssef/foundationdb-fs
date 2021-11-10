@@ -37,7 +37,7 @@ public class fdbTest {
   public void testRead() {
     // Write some data to test read
     fsLayer.createFile("/junit_test/hello");
-    fsLayer.write("/junit_test/hello", "world".getBytes(), 0);
+    fsLayer.write("/junit_test/hello", "world".getBytes());
 
     // Assert the read is correct
     assertEquals("world", new String(fsLayer.read("/junit_test/hello")));
@@ -79,6 +79,29 @@ public class fdbTest {
     String fileContent = startPhrase + continuePhrase;
     // Verify the new string has been appended
     assertEquals(fileContent, new String(fsLayer.read(filePath)));
+
+
+    //Cleanup file
+    fsLayer.clearFileContent(filePath);
+  }
+
+  @Test
+  public void testReadOffsetSize(){
+    // create new file
+    String filepath = "/file";
+    fsLayer.createFile(filepath);
+
+    // Write to the file
+    String data = "We want to read just THIS, not anything else";
+    fsLayer.write(filepath, data.getBytes(StandardCharsets.UTF_8));
+
+    System.out.println(new String(fsLayer.read(filepath)));
+
+    // Read just THIS
+    //assertEquals(new String("THIS".getBytes(StandardCharsets.UTF_8)), new String(fsLayer.read(filepath, 21, 4)));
+
+    // cleanup
+    //fsLayer.clearFileContent(filepath);
   }
 
 

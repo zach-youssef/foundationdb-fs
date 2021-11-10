@@ -88,23 +88,13 @@ public class FuseLayer extends FuseStubFS {
   }
 
   @Override
-  // TODO Completely ignores offset for now
   public int read(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
-    byte[] stored = dbOps.read(path);
-    if (stored.length > size) {
-      byte[] ret = new byte[(int) size];
-      for (int i = 0; i < size; ++i)
-        ret[i] = stored[i];
-      buf.put(0, ret, 0, (int) size);
-      return (int) size;
-    } else {
-      buf.put(0, stored, 0, stored.length);
-      return stored.length;
-    }
+    byte[] stored = dbOps.read(path, offset, size);
+    buf.put(0, stored, 0, stored.length);
+    return stored.length;
   }
 
   @Override
-  // TODO Completely ignores offset for now
   public int write(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
     byte[] data = new byte[(int) size];
     buf.get(0, data, 0, (int) size);
