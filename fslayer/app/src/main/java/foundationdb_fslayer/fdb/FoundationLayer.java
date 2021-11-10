@@ -112,4 +112,9 @@ public class FoundationLayer implements FoundationFileOperations {
   public int getFileSize(String path) {
     return dbRead(rt -> new FileSchema(path).size(directoryLayer, rt));
   }
+
+  @Override
+  public boolean truncate(String path, long size) {
+    return dbWrite(tr -> new FileSchema(path).truncate(directoryLayer, tr, size));
+  }
 }

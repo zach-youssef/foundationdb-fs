@@ -78,5 +78,15 @@ public interface FoundationFileOperations {
    */
   boolean setFileTime(Long timestamp, String path);
 
+  /**
+   * Returns a file's size
+   */
   int getFileSize(String path);
+
+
+  /**
+   *  Sets a file's size to the given length
+   *  Will delete data on shrink, and do nothing on grow
+   */
+  boolean truncate(String path, long size);
 }

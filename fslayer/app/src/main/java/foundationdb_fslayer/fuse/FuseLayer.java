@@ -1,10 +1,8 @@
 package foundationdb_fslayer.fuse;
 
-import com.apple.foundationdb.directory.DirectoryLayer;
 import foundationdb_fslayer.fdb.FoundationFileOperations;
 import foundationdb_fslayer.fdb.object.Attr;
 import jnr.ffi.Pointer;
-import jnr.ffi.types.time_t;
 import ru.serce.jnrfuse.ErrorCodes;
 import ru.serce.jnrfuse.FuseFillDir;
 import ru.serce.jnrfuse.FuseStubFS;
@@ -12,10 +10,8 @@ import ru.serce.jnrfuse.struct.FileStat;
 import ru.serce.jnrfuse.struct.FuseFileInfo;
 import ru.serce.jnrfuse.struct.Timespec;
 
-import java.util.ArrayList;
 import java.util.List;
 
-import static foundationdb_fslayer.Util.parsePath;
 
 public class FuseLayer extends FuseStubFS {
 
@@ -118,5 +114,10 @@ public class FuseLayer extends FuseStubFS {
   public int unlink(String path){
     dbOps.clearFileContent(path);
     return 0;
+  }
+
+  @Override
+  public int truncate(String path, long size) {
+    return dbOps.truncate(path,size) ? 0 : -ErrorCodes.ENOENT();
   }
 }

@@ -227,5 +227,43 @@ public class FileSchema {
         }
     }
 
+    public boolean truncate(DirectoryLayer directoryLayer, Transaction transaction, long size) {
+        // Calculate how much we need to delete
+        int currentSize = this.size(directoryLayer, transaction);
+        int bytesToDelete = currentSize - (int) size;
+
+        // If new size is bigger, ignore
+        if (bytesToDelete < 0) {
+            return true;
+        }
+
+        try {
+            // Open chunk space
+            DirectorySubspace chunkSpace = directoryLayer.createOrOpen(transaction, chunksPath).get();
+
+            // Calculate which chunks we need to delete
+            int lastChunk = currentSize / CHUNK_SIZE_BYTES;
+            int newLastChunk = (int) size / CHUNK_SIZE_BYTES;
+
+            // Clear out data at end of file
+            transaction.clear(chunkSpace.pack(newLastChunk + 1), chunkSpace.pack(lastChunk));
+
+            // Check how much data of the new last chunk we need to delete
+            currentSize = this.size(directoryLayer, transaction);
+            bytesToDelete = currentSize - (int) size;
+
+            // Update the last chunk to have data removed
+            if (bytesToDelete > 0) {
+                byte[] chunkData = transaction.get(chunkSpace.pack(newLastChunk)).get();
+                byte[] newChunkData = new byte[chunkData.length - bytesToDelete];
+                System.arraycopy(chunkData, 0, newChunkData, 0, newChunkData.length);
+                transaction.set(chunkSpace.pack(newLastChunk), newChunkData);
+            }
+            return true;
+
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
 }
