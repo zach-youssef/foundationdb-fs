@@ -35,11 +35,15 @@ public class FuseLayer extends FuseStubFS {
 
     switch (attr.getObjectType()) {
       case FILE:
-        stat.st_mode.set(FileStat.S_IFREG | 0777);
+        stat.st_mode.set(FileStat.S_IFREG | attr.getMode());
         stat.st_size.set(dbOps.getFileSize(path));
+        stat.st_uid.set(attr.getUid());
+        stat.st_gid.set(attr.getGid());
+        stat.st_mtim.tv_sec.set(attr.getTimestamp());
+        stat.st_mtim.tv_nsec.set(0);
         break;
       case DIRECTORY:
-        stat.st_mode.set(FileStat.S_IFDIR | 0755);
+        stat.st_mode.set(FileStat.S_IFDIR | 0755); // TODO set file mode, UID, GID
         stat.st_nlink.set(2);
         break;
       case NOT_FOUND:
@@ -56,6 +60,11 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int opendir(String path, FuseFileInfo fi) {
+    return 0;
+  }
+
+  @Override
+  public int release(String path, FuseFileInfo fi) {
     return 0;
   }
 
@@ -96,13 +105,18 @@ public class FuseLayer extends FuseStubFS {
     buf.get(0, data, 0, (int) size);
 
     dbOps.write(path, data, offset);
+    dbOps.setFileTime(System.currentTimeMillis(), path);
 
     return (int) size;
   }
 
   @Override
   public int mknod(String path, long mode, long rdev) {
-    return dbOps.createFile(path) ? 0 : -ErrorCodes.ENOENT();
+    return (dbOps.createFile(path)
+            && dbOps.chmod(path, mode)
+            && dbOps.setFileTime(System.currentTimeMillis(), path))
+            ? 0
+            : -ErrorCodes.ENOENT();
   }
 
   @Override
@@ -119,5 +133,20 @@ public class FuseLayer extends FuseStubFS {
   @Override
   public int truncate(String path, long size) {
     return dbOps.truncate(path,size) ? 0 : -ErrorCodes.ENOENT();
+  }
+
+  @Override
+  public int chmod(String path, long mode) {
+    return dbOps.chmod(path, mode) ? 0 : -ErrorCodes.ENOENT();
+  }
+
+  @Override
+  public int flush(String path, FuseFileInfo fi) {
+    return 0;
+  }
+
+  @Override
+  public int chown(String path, long uid, long gid) {
+    return dbOps.chown(path, uid, gid) ? 0 : -ErrorCodes.ENOENT();
   }
 }

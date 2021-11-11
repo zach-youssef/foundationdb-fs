@@ -89,4 +89,15 @@ public interface FoundationFileOperations {
    *  Will delete data on shrink, and do nothing on grow
    */
   boolean truncate(String path, long size);
+
+  /**
+   *  Sets a file's mode to the given value
+   */
+  boolean chmod(String path, long mode);
+
+  /**
+   *  Set the UID / GID of the file for linux
+   *  permissions.
+   */
+  boolean chown(String path, long uid, long gid);
 }

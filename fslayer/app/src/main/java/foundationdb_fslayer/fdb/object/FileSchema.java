@@ -21,7 +21,9 @@ public class FileSchema {
     private static class Metadata {
         final static String CHUNKS = "CHUNKS";
         final static String TIMESTAMP = "TIMESTAMP";
-        final static String SIZE = "SIZE";
+        final static String MODE = "MODE";
+        final static String USER = "UID";
+        final static String GROUP = "GID";
     }
 
     public FileSchema(String path) {
@@ -204,6 +206,16 @@ public class FileSchema {
                 switch (key) {
                     case Metadata.TIMESTAMP:
                         attr = attr.setTimestamp(value.getLong(0));
+                        System.err.println("Reading timestamp " + attr.getTimestamp());
+                        break;
+                    case Metadata.MODE:
+                        attr = attr.setMode(value.getLong(0));
+                        break;
+                    case Metadata.GROUP:
+                        attr.setGid(value.getLong(0));
+                        break;
+                    case Metadata.USER:
+                        attr.setUid(value.getLong(0));
                     default:
                         break;
                 }
@@ -214,12 +226,27 @@ public class FileSchema {
     }
 
     /**
+     * Set the mode of this file (chmod)
+     * Returns false if fails
+     */
+    public boolean setMode(DirectoryLayer directoryLayer, Transaction transaction, long mode) {
+        try {
+            DirectorySubspace filespace = directoryLayer.open(transaction, path).get();
+            transaction.set(filespace.pack(Metadata.MODE), Tuple.from(mode).pack());
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
      * Set the timestamp on this file
      * Returns false if fails
      */
     public boolean setTimestamp(DirectoryLayer directoryLayer, Transaction transaction, long unixTimeSeconds) {
         try {
             DirectorySubspace fileSpace = directoryLayer.open(transaction, path).get();
+            System.err.println("Setting timestamp to " + unixTimeSeconds);
             transaction.set(fileSpace.pack(Metadata.TIMESTAMP), Tuple.from(unixTimeSeconds).pack());
             return true;
         } catch (Exception e) {
@@ -266,4 +293,15 @@ public class FileSchema {
         }
     }
 
+
+    public boolean setOwnership(DirectoryLayer directoryLayer, Transaction tr, long uid, long gid) {
+        try {
+            DirectorySubspace fileSpace = directoryLayer.open(tr, path).get();
+            tr.set(fileSpace.pack(Metadata.USER), Tuple.from(uid).pack());
+            tr.set(fileSpace.pack(Metadata.GROUP), Tuple.from(gid).pack());
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
 }
