@@ -37,9 +37,13 @@ public class FuseLayer extends FuseStubFS {
       case FILE:
         stat.st_mode.set(FileStat.S_IFREG | attr.getMode());
         stat.st_size.set(dbOps.getFileSize(path));
+        stat.st_uid.set(attr.getUid());
+        stat.st_gid.set(attr.getGid());
+        stat.st_mtim.tv_sec.set(attr.getTimestamp());
+        stat.st_mtim.tv_nsec.set(0);
         break;
       case DIRECTORY:
-        stat.st_mode.set(FileStat.S_IFDIR | 0755); // TODO set file mode
+        stat.st_mode.set(FileStat.S_IFDIR | 0755); // TODO set file mode, UID, GID
         stat.st_nlink.set(2);
         break;
       case NOT_FOUND:
@@ -101,6 +105,7 @@ public class FuseLayer extends FuseStubFS {
     buf.get(0, data, 0, (int) size);
 
     dbOps.write(path, data, offset);
+    dbOps.setFileTime(System.currentTimeMillis(), path);
 
     return (int) size;
   }
@@ -108,7 +113,8 @@ public class FuseLayer extends FuseStubFS {
   @Override
   public int mknod(String path, long mode, long rdev) {
     return (dbOps.createFile(path)
-            && dbOps.chmod(path, mode))
+            && dbOps.chmod(path, mode)
+            && dbOps.setFileTime(System.currentTimeMillis(), path))
             ? 0
             : -ErrorCodes.ENOENT();
   }
@@ -137,5 +143,10 @@ public class FuseLayer extends FuseStubFS {
   @Override
   public int flush(String path, FuseFileInfo fi) {
     return 0;
+  }
+
+  @Override
+  public int chown(String path, long uid, long gid) {
+    return dbOps.chown(path, uid, gid) ? 0 : -ErrorCodes.ENOENT();
   }
 }

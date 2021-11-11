@@ -123,4 +123,9 @@ public class FoundationLayer implements FoundationFileOperations {
   public boolean chmod(String path, long mode) {
     return dbWrite(tr -> new FileSchema(path).setMode(directoryLayer, tr, mode));
   }
+
+  @Override
+  public boolean chown(String path, long uid, long gid) {
+    return dbWrite(tr -> new FileSchema(path).setOwnership(directoryLayer, tr, uid, gid));
+  }
 }
