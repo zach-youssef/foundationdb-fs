@@ -22,6 +22,7 @@ public class FileSchema {
         final static String CHUNKS = "CHUNKS";
         final static String TIMESTAMP = "TIMESTAMP";
         final static String SIZE = "SIZE";
+        final static String MODE = "MODE";
     }
 
     public FileSchema(String path) {
@@ -204,6 +205,8 @@ public class FileSchema {
                 switch (key) {
                     case Metadata.TIMESTAMP:
                         attr = attr.setTimestamp(value.getLong(0));
+                    case Metadata.MODE:
+                        attr = attr.setMode(value.getLong(0));
                     default:
                         break;
                 }
@@ -211,6 +214,20 @@ public class FileSchema {
         } catch (Exception ignored){}
 
         return attr;
+    }
+
+    /**
+     * Set the mode of this file (chmod)
+     * Returns false if fails
+     */
+    public boolean setMode(DirectoryLayer directoryLayer, Transaction transaction, long mode) {
+        try {
+            DirectorySubspace filespace = directoryLayer.open(transaction, path).get();
+            transaction.set(filespace.pack(Metadata.MODE), Tuple.from(mode).pack());
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**

@@ -117,4 +117,10 @@ public class FoundationLayer implements FoundationFileOperations {
   public boolean truncate(String path, long size) {
     return dbWrite(tr -> new FileSchema(path).truncate(directoryLayer, tr, size));
   }
+
+  @Override
+  // TODO check if file or directory, then set mode accordingly
+  public boolean chmod(String path, long mode) {
+    return dbWrite(tr -> new FileSchema(path).setMode(directoryLayer, tr, mode));
+  }
 }
