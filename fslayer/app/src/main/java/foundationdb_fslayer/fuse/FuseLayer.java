@@ -55,6 +55,7 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int open(String path, FuseFileInfo fi) {
+    fi.fh.set(dbOps.open(path, fi.flags.intValue()));
     return 0;
   }
 
@@ -94,7 +95,8 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int read(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
-    byte[] stored = dbOps.read(path, offset, size);
+    int version = fi.fh.intValue();
+    byte[] stored = dbOps.read(path, offset, size, version);
     buf.put(0, stored, 0, stored.length);
     return stored.length;
   }
@@ -104,7 +106,7 @@ public class FuseLayer extends FuseStubFS {
     byte[] data = new byte[(int) size];
     buf.get(0, data, 0, (int) size);
 
-    dbOps.write(path, data, offset);
+    dbOps.write(path, data, offset, fi.fh.intValue());
     dbOps.setFileTime(System.currentTimeMillis(), path);
 
     return (int) size;

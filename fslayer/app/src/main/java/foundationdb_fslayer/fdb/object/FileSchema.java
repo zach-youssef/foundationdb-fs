@@ -6,6 +6,7 @@ import com.apple.foundationdb.Transaction;
 import com.apple.foundationdb.directory.DirectoryLayer;
 import com.apple.foundationdb.directory.DirectorySubspace;
 import com.apple.foundationdb.tuple.Tuple;
+import jnr.constants.platform.linux.OpenFlags;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +25,7 @@ public class FileSchema {
         final static String MODE = "MODE";
         final static String USER = "UID";
         final static String GROUP = "GID";
+        final static String VERSION = "VERSION";
     }
 
     public FileSchema(String path) {
@@ -44,6 +46,8 @@ public class FileSchema {
             DirectorySubspace chunkSpace = dir.create(transaction, chunksPath).get();
             // Initialize empty first chunk
             transaction.set(chunkSpace.pack(0), new byte[0]);
+            // Initialize Version counter
+            transaction.set(fileSpace.pack(Metadata.VERSION), Tuple.from(0L).pack());
 
             return true;
         } catch (Exception e) {
@@ -56,7 +60,11 @@ public class FileSchema {
      * Reads the current value of the file.
      * Will return null on error.
      */
-    public byte[] read(DirectoryLayer dir, ReadTransaction transaction, long offset, long size) {
+    public byte[] read(DirectoryLayer dir, ReadTransaction transaction, long offset, long size, int version) {
+        if (!modifyPermitted(dir, transaction, version)) {
+            return null;
+        }
+
         try {
             // Open the file's chunk space
             DirectorySubspace chunkSpace = dir.open(transaction, chunksPath).get();
@@ -106,7 +114,11 @@ public class FileSchema {
      * Appends the given bytes to the file.
      * Returns false if an error occurs.
      */
-    public boolean write(DirectoryLayer dir, Transaction transaction, byte[] data, long offset) {
+    public boolean write(DirectoryLayer dir, Transaction transaction, byte[] data, long offset, int version) {
+        if (!modifyPermitted(dir, transaction, version)) {
+            return false;
+        }
+
         try {
             DirectorySubspace chunkSpace = dir.open(transaction, chunksPath).get();
 
@@ -303,5 +315,40 @@ public class FileSchema {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    public long getVersion(DirectoryLayer directoryLayer, ReadTransaction rt) {
+        try {
+            DirectorySubspace fileSpace = directoryLayer.open(rt, path).get();
+            return Tuple.fromBytes(rt.get(fileSpace.pack(Metadata.VERSION)).get())
+                    .getLong(0);
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    public long incrementVersion(DirectoryLayer directoryLayer, Transaction tr) {
+        long currentVersion = getVersion(directoryLayer, tr);
+        try {
+            DirectorySubspace fileSpace = directoryLayer.open(tr, path).get();
+            tr.set(fileSpace.pack(Metadata.VERSION), Tuple.from(currentVersion + 1).pack());
+            return currentVersion + 1;
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    public int open(DirectoryLayer directoryLayer, Transaction tr, int flags) {
+        if ((flags | OpenFlags.O_CREAT.intValue()) != 0
+                && this.getVersion(directoryLayer, tr) < 0) {
+            this.create(directoryLayer, tr);
+        }
+
+        return (int) incrementVersion(directoryLayer, tr);
+    }
+
+    private boolean modifyPermitted(DirectoryLayer directoryLayer, ReadTransaction rt, int version) {
+        System.err.println("VERSION: ");
+        return version == (int) getVersion(directoryLayer, rt);
     }
 }
