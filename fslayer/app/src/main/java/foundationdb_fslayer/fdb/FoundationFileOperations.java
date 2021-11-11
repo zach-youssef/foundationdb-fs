@@ -12,7 +12,11 @@ public interface FoundationFileOperations {
    * @param path file path
    * @return encoded byte representation of the file content
    */
-  byte[] read(String path);
+  byte[] read(String path, long offset, long size);
+
+  default byte[] read(String path){
+    return read(path, 0, getFileSize(path));
+  }
 
   /**
    * Write to a file
@@ -21,6 +25,10 @@ public interface FoundationFileOperations {
    * @param data data to be added to file
    */
   void write(String path, byte[] data, long offset);
+
+  default void write(String path, byte[] data){
+    write(path, data, 0);
+  }
 
   /**
    * Remove an empty directory if exists.
@@ -70,5 +78,15 @@ public interface FoundationFileOperations {
    */
   boolean setFileTime(Long timestamp, String path);
 
+  /**
+   * Returns a file's size
+   */
   int getFileSize(String path);
+
+
+  /**
+   *  Sets a file's size to the given length
+   *  Will delete data on shrink, and do nothing on grow
+   */
+  boolean truncate(String path, long size);
 }

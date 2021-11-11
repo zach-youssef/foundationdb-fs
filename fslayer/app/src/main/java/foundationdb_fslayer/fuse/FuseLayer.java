@@ -1,10 +1,8 @@
 package foundationdb_fslayer.fuse;
 
-import com.apple.foundationdb.directory.DirectoryLayer;
 import foundationdb_fslayer.fdb.FoundationFileOperations;
 import foundationdb_fslayer.fdb.object.Attr;
 import jnr.ffi.Pointer;
-import jnr.ffi.types.time_t;
 import ru.serce.jnrfuse.ErrorCodes;
 import ru.serce.jnrfuse.FuseFillDir;
 import ru.serce.jnrfuse.FuseStubFS;
@@ -12,10 +10,8 @@ import ru.serce.jnrfuse.struct.FileStat;
 import ru.serce.jnrfuse.struct.FuseFileInfo;
 import ru.serce.jnrfuse.struct.Timespec;
 
-import java.util.ArrayList;
 import java.util.List;
 
-import static foundationdb_fslayer.Util.parsePath;
 
 public class FuseLayer extends FuseStubFS {
 
@@ -88,23 +84,13 @@ public class FuseLayer extends FuseStubFS {
   }
 
   @Override
-  // TODO Completely ignores offset for now
   public int read(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
-    byte[] stored = dbOps.read(path);
-    if (stored.length > size) {
-      byte[] ret = new byte[(int) size];
-      for (int i = 0; i < size; ++i)
-        ret[i] = stored[i];
-      buf.put(0, ret, 0, (int) size);
-      return (int) size;
-    } else {
-      buf.put(0, stored, 0, stored.length);
-      return stored.length;
-    }
+    byte[] stored = dbOps.read(path, offset, size);
+    buf.put(0, stored, 0, stored.length);
+    return stored.length;
   }
 
   @Override
-  // TODO Completely ignores offset for now
   public int write(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
     byte[] data = new byte[(int) size];
     buf.get(0, data, 0, (int) size);
@@ -128,5 +114,10 @@ public class FuseLayer extends FuseStubFS {
   public int unlink(String path){
     dbOps.clearFileContent(path);
     return 0;
+  }
+
+  @Override
+  public int truncate(String path, long size) {
+    return dbOps.truncate(path,size) ? 0 : -ErrorCodes.ENOENT();
   }
 }
