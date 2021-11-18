@@ -6,14 +6,19 @@ import com.apple.foundationdb.Transaction;
 import com.apple.foundationdb.directory.DirectoryLayer;
 import com.apple.foundationdb.directory.DirectorySubspace;
 import com.apple.foundationdb.tuple.Tuple;
+import foundationdb_fslayer.cache.FileCacheEntry;
+import foundationdb_fslayer.cache.FsCacheSingleton;
 import jnr.constants.platform.linux.OpenFlags;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static foundationdb_fslayer.Util.parsePath;
 
 public class FileSchema {
+    private final String rawPath;
     private final List<String> path;
     private final List<String> chunksPath;
 
@@ -29,6 +34,7 @@ public class FileSchema {
     }
 
     public FileSchema(String path) {
+        this.rawPath = path;
         this.path = parsePath(path);
         this.chunksPath = new ArrayList<>(this.path);
         this.chunksPath.add(Metadata.CHUNKS);
@@ -72,21 +78,19 @@ public class FileSchema {
             // Grab all the relevant chunks of the file
             int startChunk = (int) (offset / CHUNK_SIZE_BYTES);
             int endChunk = (int) ((offset + size) / CHUNK_SIZE_BYTES);
-            List<KeyValue> chunks = transaction
-                    .getRange(chunkSpace.pack(startChunk), chunkSpace.pack(endChunk))
-                    .asList().get();
+            List<byte[]> chunks = getCache(dir, transaction).getData(startChunk, endChunk);
 
             // Initialize buffer to store file
             byte[] data = new byte[(int) Math.min(this.size(dir, transaction) - offset, size)];
             int dataIndex = 0;
 
-            for (KeyValue chunk : chunks) {
+            for (int i = 0; i < chunks.size(); ++i) {
                 int copyIndex = 0;
-                if (chunkSpace.unpack(chunk.getKey()).get(0).equals(startChunk)) {
+                if (i == 0) {
                     // If this is the first chunk, make sure we start at the offset
                     copyIndex += offset % CHUNK_SIZE_BYTES;
                 }
-                byte[] chunkData = chunk.getValue();
+                byte[] chunkData = chunks.get(i);
                 // Copy the data from the chunk into the return buffer
                 for (; copyIndex < chunkData.length && dataIndex < data.length; copyIndex++){
                     data[dataIndex++] = chunkData[copyIndex];
@@ -102,9 +106,8 @@ public class FileSchema {
     /** Calculate total size of the file */
     public int size(DirectoryLayer dir, ReadTransaction transaction) {
         try {
-            DirectorySubspace chunkSpace = dir.open(transaction, chunksPath).get();
-            List<KeyValue> chunks = transaction.getRange(chunkSpace.range()).asList().get();
-            return ((chunks.size() - 1) * CHUNK_SIZE_BYTES) + (chunks.get(chunks.size() - 1).getValue().length);
+            List<byte[]> chunks = getCache(dir, transaction).getData();
+            return ((chunks.size() - 1) * CHUNK_SIZE_BYTES) + (chunks.get(chunks.size() - 1).length);
         } catch (Exception e) {
             return -1;
         }
@@ -126,11 +129,8 @@ public class FileSchema {
             int startChunk = (int) (offset / CHUNK_SIZE_BYTES);
             int endChunk = (int) ((offset + data.length) / CHUNK_SIZE_BYTES);
             // Grab the chunks we are not completely overwriting
-            byte[] startChunkData = transaction.get(chunkSpace.pack(startChunk)).get();
-            byte[] endChunkData = transaction.get(chunkSpace.pack(endChunk)).get();
-
-            if (startChunkData == null) startChunkData = new byte[0];
-            if (endChunkData == null) endChunkData = new byte[0];
+            byte[] startChunkData = getCache(dir, transaction).getData(startChunk);
+            byte[] endChunkData = getCache(dir, transaction).getData(endChunk);
 
             // Keep track of what has been written
             int bytesWritten = 0;
@@ -175,7 +175,7 @@ public class FileSchema {
                 transaction.set(chunkSpace.pack(chunkNum), newBuffer);
             }
 
-
+            this.incrementVersion(dir, transaction);
             return true;
         } catch (Exception e) {
             return false;
@@ -198,6 +198,8 @@ public class FileSchema {
             transaction.clear(fileSpace.range());
             // Delete the file space itself
             directoryLayer.removeIfExists(transaction, path).get();
+            // Clear the cache for this file
+            FsCacheSingleton.removeFromCache(rawPath);
             return true;
         } catch (Exception e) {
             e.printStackTrace();
@@ -245,6 +247,7 @@ public class FileSchema {
         try {
             DirectorySubspace filespace = directoryLayer.open(transaction, path).get();
             transaction.set(filespace.pack(Metadata.MODE), Tuple.from(mode).pack());
+            this.incrementVersion(directoryLayer, transaction);
             return true;
         } catch (Exception e) {
             return false;
@@ -293,11 +296,12 @@ public class FileSchema {
 
             // Update the last chunk to have data removed
             if (bytesToDelete > 0) {
-                byte[] chunkData = transaction.get(chunkSpace.pack(newLastChunk)).get();
+                byte[] chunkData = getCache(directoryLayer, transaction).getData(newLastChunk);
                 byte[] newChunkData = new byte[chunkData.length - bytesToDelete];
                 System.arraycopy(chunkData, 0, newChunkData, 0, newChunkData.length);
                 transaction.set(chunkSpace.pack(newLastChunk), newChunkData);
             }
+            this.incrementVersion(directoryLayer, transaction);
             return true;
 
         } catch (Exception e) {
@@ -339,16 +343,53 @@ public class FileSchema {
     }
 
     public int open(DirectoryLayer directoryLayer, Transaction tr, int flags) {
+        return (int) getVersion(directoryLayer, tr);
+
+        /*
         if ((flags | OpenFlags.O_CREAT.intValue()) != 0
                 && this.getVersion(directoryLayer, tr) < 0) {
             this.create(directoryLayer, tr);
         }
 
         return (int) incrementVersion(directoryLayer, tr);
+        */
     }
 
     private boolean modifyPermitted(DirectoryLayer directoryLayer, ReadTransaction rt, int version) {
-        System.err.println("VERSION: ");
-        return version == (int) getVersion(directoryLayer, rt);
+        // System.err.println("VERSION: ");
+        // return version == (int) getVersion(directoryLayer, rt);
+        return true;
+    }
+
+    public List<byte[]> loadChunks(DirectoryLayer directoryLayer, ReadTransaction rt) {
+        try {
+            DirectorySubspace chunkSpace = directoryLayer.open(rt, chunksPath).get();
+
+            return rt.getRange(chunkSpace.range())
+                    .asList()
+                    .get()
+                    .stream()
+                    .map(KeyValue::getValue)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+    }
+
+    private FileCacheEntry getCache(DirectoryLayer directoryLayer, ReadTransaction rt) {
+        ensureCacheEntryPresent(directoryLayer, rt);
+
+        Optional<FileCacheEntry> cacheEntry = FsCacheSingleton.getFile(rawPath);
+        if (!cacheEntry.isPresent()) {
+            throw new IllegalStateException("Cache empty even after load! " + rawPath);
+        }
+
+        return cacheEntry.get().reloadIfOutdated(directoryLayer, rt);
+    }
+
+    private void ensureCacheEntryPresent(DirectoryLayer directoryLayer, ReadTransaction rt) {
+        if (!FsCacheSingleton.inCache(rawPath)) {
+            FsCacheSingleton.loadToCache(rawPath, directoryLayer, rt);
+        }
     }
 }
