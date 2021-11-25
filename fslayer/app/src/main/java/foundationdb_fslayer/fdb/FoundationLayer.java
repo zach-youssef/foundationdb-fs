@@ -3,6 +3,7 @@ package foundationdb_fslayer.fdb;
 import com.apple.foundationdb.*;
 import com.apple.foundationdb.directory.DirectoryLayer;
 import com.apple.foundationdb.directory.DirectorySubspace;
+import foundationdb_fslayer.cache.FsCacheSingleton;
 import foundationdb_fslayer.fdb.object.Attr;
 import foundationdb_fslayer.fdb.object.DirectorySchema;
 import foundationdb_fslayer.fdb.object.FileSchema;

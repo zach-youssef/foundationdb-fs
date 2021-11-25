@@ -31,7 +31,7 @@ public class FileCacheEntry {
 
     public FileCacheEntry reload(DirectoryLayer directoryLayer, ReadTransaction rt){
         this.version = schema.getVersion(directoryLayer, rt);
-        this.metadata = schema.getMetadata(directoryLayer, rt);
+        this.metadata = schema.loadMetadata(directoryLayer, rt);
         this.data = schema.loadChunks(directoryLayer, rt);
         return this;
     }

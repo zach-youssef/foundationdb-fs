@@ -207,12 +207,12 @@ public class FileSchema {
         }
     }
 
-    public Attr getMetadata(DirectoryLayer directoryLayer, ReadTransaction transaction) {
+    public Attr loadMetadata(DirectoryLayer directoryLayer, ReadTransaction readTransaction) {
         Attr attr = new Attr().setObjectType(ObjectType.FILE);
 
         try {
-            DirectorySubspace fileSpace = directoryLayer.open(transaction, path).get();
-            List<KeyValue> metadata = transaction.getRange(fileSpace.range()).asList().get();
+            DirectorySubspace fileSpace = directoryLayer.open(readTransaction, path).get();
+            List<KeyValue> metadata = readTransaction.getRange(fileSpace.range()).asList().get();
 
             for (KeyValue kv : metadata) {
                 String key = fileSpace.unpack(kv.getKey()).getString(0);
@@ -237,6 +237,10 @@ public class FileSchema {
         } catch (Exception ignored){}
 
         return attr;
+    }
+
+    public Attr getMetadata(DirectoryLayer directoryLayer, ReadTransaction transaction) {
+        return getCache(directoryLayer, transaction).getMetadata();
     }
 
     /**
@@ -315,6 +319,7 @@ public class FileSchema {
             DirectorySubspace fileSpace = directoryLayer.open(tr, path).get();
             tr.set(fileSpace.pack(Metadata.USER), Tuple.from(uid).pack());
             tr.set(fileSpace.pack(Metadata.GROUP), Tuple.from(gid).pack());
+            incrementVersion(directoryLayer, tr);
             return true;
         } catch (Exception e) {
             return false;
