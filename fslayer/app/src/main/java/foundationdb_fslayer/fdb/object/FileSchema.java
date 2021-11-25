@@ -8,7 +8,6 @@ import com.apple.foundationdb.directory.DirectorySubspace;
 import com.apple.foundationdb.tuple.Tuple;
 import foundationdb_fslayer.cache.FileCacheEntry;
 import foundationdb_fslayer.cache.FsCacheSingleton;
-import jnr.constants.platform.linux.OpenFlags;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,12 +16,31 @@ import java.util.stream.Collectors;
 
 import static foundationdb_fslayer.Util.parsePath;
 
-public class FileSchema {
+public class FileSchema extends AbstractSchema {
     private final String rawPath;
     private final List<String> path;
     private final List<String> chunksPath;
 
     public final static int CHUNK_SIZE_BYTES = 1000;
+
+    @Override
+    protected String getPath() {
+        return rawPath;
+    }
+
+    @Override
+    protected DirectorySubspace getMetadataSpace(DirectoryLayer directoryLayer, ReadTransaction rt) {
+        try {
+            return directoryLayer.open(rt, path).get();
+        } catch (Exception e) {
+            throw new IllegalStateException("this dir dont exist");
+        }
+    }
+
+    @Override
+    protected String getVersionKey() {
+        return Metadata.VERSION;
+    }
 
     private static class Metadata {
         final static String CHUNKS = "CHUNKS";
@@ -54,6 +72,8 @@ public class FileSchema {
             transaction.set(chunkSpace.pack(0), new byte[0]);
             // Initialize Version counter
             transaction.set(fileSpace.pack(Metadata.VERSION), Tuple.from(0L).pack());
+            // Invalidate the cache of the parent dir
+            incrementParentVersion(dir, transaction);;
 
             return true;
         } catch (Exception e) {
@@ -199,7 +219,9 @@ public class FileSchema {
             // Delete the file space itself
             directoryLayer.removeIfExists(transaction, path).get();
             // Clear the cache for this file
-            FsCacheSingleton.removeFromCache(rawPath);
+            FsCacheSingleton.removeFileFromCache(rawPath);
+            // Invalidate the cache of the parent dir
+            incrementParentVersion(directoryLayer, transaction);;
             return true;
         } catch (Exception e) {
             e.printStackTrace();
@@ -326,27 +348,6 @@ public class FileSchema {
         }
     }
 
-    public long getVersion(DirectoryLayer directoryLayer, ReadTransaction rt) {
-        try {
-            DirectorySubspace fileSpace = directoryLayer.open(rt, path).get();
-            return Tuple.fromBytes(rt.get(fileSpace.pack(Metadata.VERSION)).get())
-                    .getLong(0);
-        } catch (Exception e) {
-            return -1;
-        }
-    }
-
-    public long incrementVersion(DirectoryLayer directoryLayer, Transaction tr) {
-        long currentVersion = getVersion(directoryLayer, tr);
-        try {
-            DirectorySubspace fileSpace = directoryLayer.open(tr, path).get();
-            tr.set(fileSpace.pack(Metadata.VERSION), Tuple.from(currentVersion + 1).pack());
-            return currentVersion + 1;
-        } catch (Exception e) {
-            return -1;
-        }
-    }
-
     public int open(DirectoryLayer directoryLayer, Transaction tr, int flags) {
         return (int) getVersion(directoryLayer, tr);
 
@@ -393,8 +394,8 @@ public class FileSchema {
     }
 
     private void ensureCacheEntryPresent(DirectoryLayer directoryLayer, ReadTransaction rt) {
-        if (!FsCacheSingleton.inCache(rawPath)) {
-            FsCacheSingleton.loadToCache(rawPath, directoryLayer, rt);
+        if (!FsCacheSingleton.fileInCache(rawPath)) {
+            FsCacheSingleton.loadFileToCache(rawPath, directoryLayer, rt);
         }
     }
 }
