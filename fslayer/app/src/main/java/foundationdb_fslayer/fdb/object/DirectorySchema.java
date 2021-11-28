@@ -2,7 +2,6 @@ package foundationdb_fslayer.fdb.object;
 
 import com.apple.foundationdb.ReadTransaction;
 import com.apple.foundationdb.Transaction;
-import com.apple.foundationdb.directory.Directory;
 import com.apple.foundationdb.directory.DirectoryLayer;
 import com.apple.foundationdb.directory.DirectorySubspace;
 import com.apple.foundationdb.tuple.Tuple;
@@ -23,11 +22,12 @@ public class DirectorySchema extends AbstractSchema{
         this.rawPath = path;
         this.paths = Util.parsePath(path);
         this.metadataPath = new ArrayList<>(paths);
-        paths.add(Metadata.META_ROOT);
+        metadataPath.add(Metadata.META_ROOT);
     }
 
     public Attr getMetadata(DirectoryLayer directoryLayer, ReadTransaction rt) {
-        return loadCache(directoryLayer, rt).getMetadata();
+        // TODO pass the cache entry to this method so it can be reloaded at the FoundationLayer
+        return this.loadMetadata(directoryLayer, rt);
     }
 
     public Attr loadMetadata(DirectoryLayer directoryLayer, ReadTransaction rt) {
@@ -84,10 +84,9 @@ public class DirectorySchema extends AbstractSchema{
         try {
             // Create this directory
             DirectorySubspace subspace =  dir.createOrOpen(transaction, paths).get();
-            // Create internal metadata subspace
-            DirectorySubspace metaSpace = dir.createOrOpen(transaction, metadataPath).get();
-            // Initialize the directory's write version
-            transaction.set(metaSpace.pack(Metadata.VERSION), Tuple.from(0).pack());
+            // Initialize the metadata space
+            initMetadata(dir, transaction);
+            // Invalidate the cache of the parent directory contents
             incrementParentVersion(dir, transaction);
             return subspace;
         } catch (Exception e) {
@@ -95,28 +94,17 @@ public class DirectorySchema extends AbstractSchema{
         }
     }
 
-    public List<String> loadChildren(DirectoryLayer directoryLayer, ReadTransaction rt) {
+    public void initMetadata(DirectoryLayer dir, Transaction transaction) {
         try {
-            return directoryLayer.list(rt, paths).get();
+            // Create internal metadata subspace
+            DirectorySubspace metaSpace = dir.createOrOpen(transaction, metadataPath).get();
+            // Initialize the directory's write version
+            transaction.set(metaSpace.pack(Metadata.VERSION), Tuple.from(0).pack());
         } catch (Exception e) {
-            return null;
+            System.err.println("Failed to initialize metadata for directory " + rawPath);
+            System.err.print("Metadata path = ");
+            System.err.println(metadataPath);
+            e.printStackTrace();
         }
-    }
-
-    public List<String> ls(DirectoryLayer dir, ReadTransaction rt) {
-        return loadCache(dir, rt).getChildren();
-    }
-
-    private DirectoryCacheEntry loadCache(DirectoryLayer directoryLayer, ReadTransaction readTransaction) {
-        if (!FsCacheSingleton.dirInCache(this.rawPath)) {
-            FsCacheSingleton.loadDirToCache(this.rawPath, directoryLayer, readTransaction);
-        }
-
-        Optional<DirectoryCacheEntry> entry = FsCacheSingleton.getDir(rawPath);
-
-        if (!entry.isPresent()) {
-            throw new IllegalStateException("Dir not present in cache after load");
-        }
-        return entry.get().reloadIfOutdated(directoryLayer, readTransaction);
     }
 }

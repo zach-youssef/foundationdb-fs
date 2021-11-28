@@ -102,4 +102,6 @@ public interface FoundationFileOperations {
   boolean chown(String path, long uid, long gid);
 
   int open(String path, int flags);
+
+  void initRootIfNeeded();
 }

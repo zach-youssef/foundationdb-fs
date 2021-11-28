@@ -6,6 +6,7 @@ import foundationdb_fslayer.fdb.object.DirectorySchema;
 import foundationdb_fslayer.fdb.object.FileSchema;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Optional;
 
 public class FsCacheSingleton {
@@ -29,9 +30,9 @@ public class FsCacheSingleton {
         return FILE_CACHE.containsKey(path);
     }
 
-    public static void loadDirToCache(String path, DirectoryLayer directoryLayer, ReadTransaction rt) {
-        DirectorySchema schama = new DirectorySchema(path);
-        DIR_CACHE.put(path, DirectoryCacheEntry.loadFromDB(schama, directoryLayer, rt));
+    public static void loadDirToCache(String path, DirectoryLayer directoryLayer, ReadTransaction rt, List<String> children) {
+        DirectorySchema schema = new DirectorySchema(path);
+        DIR_CACHE.put(path, DirectoryCacheEntry.loadFromDB(children, schema, directoryLayer, rt));
     }
 
     public static void removeDirFromCache(String path) {

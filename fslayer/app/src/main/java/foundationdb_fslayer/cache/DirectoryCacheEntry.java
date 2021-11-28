@@ -16,27 +16,25 @@ public class DirectoryCacheEntry {
     private DirectoryCacheEntry() {}
 
     public static DirectoryCacheEntry loadFromDB(
+            List<String> children,
             DirectorySchema schema,
             DirectoryLayer directoryLayer,
             ReadTransaction rt) {
         DirectoryCacheEntry entry = new DirectoryCacheEntry();
         entry.schema = schema;
-        return entry.reload(directoryLayer, rt);
+        return entry.reload(directoryLayer, rt, children);
     }
 
-    public DirectoryCacheEntry reload(DirectoryLayer directoryLayer, ReadTransaction rt) {
+    public DirectoryCacheEntry reload(DirectoryLayer directoryLayer, ReadTransaction rt, List<String> children) {
         this.version = schema.getVersion(directoryLayer, rt);
         this.metadata = schema.loadMetadata(directoryLayer, rt);
-        this.children = schema.loadChildren(directoryLayer, rt);
+        this.children = children;
 
         return this;
     }
 
-    public DirectoryCacheEntry reloadIfOutdated(DirectoryLayer directoryLayer, ReadTransaction readTransaction) {
-        if (schema.getVersion(directoryLayer, readTransaction) != version) {
-            return this.reload(directoryLayer, readTransaction);
-        }
-        return this;
+    public boolean isCurrent(DirectoryLayer directoryLayer, ReadTransaction rt)  {
+        return this.version == schema.getVersion(directoryLayer, rt);
     }
 
     public long getVersion() {

@@ -24,6 +24,12 @@ abstract public class AbstractSchema {
         String path = getPath();
         String parentPath = path.substring(0, path.lastIndexOf("/"));
 
+        if (parentPath.equals("")) {
+            parentPath = "/";
+        }
+
+        System.out.println("ATTEMPTING TO INCREMENT VERSION OF " + parentPath);
+
         new DirectorySchema(parentPath).incrementVersion(dir, tr);
     }
 
