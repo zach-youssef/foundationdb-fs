@@ -25,11 +25,6 @@ public class DirectorySchema extends AbstractSchema{
         metadataPath.add(Metadata.META_ROOT);
     }
 
-    public Attr getMetadata(DirectoryLayer directoryLayer, ReadTransaction rt) {
-        // TODO pass the cache entry to this method so it can be reloaded at the FoundationLayer
-        return this.loadMetadata(directoryLayer, rt);
-    }
-
     public Attr loadMetadata(DirectoryLayer directoryLayer, ReadTransaction rt) {
         // TODO
         return new Attr().setObjectType(ObjectType.DIRECTORY);

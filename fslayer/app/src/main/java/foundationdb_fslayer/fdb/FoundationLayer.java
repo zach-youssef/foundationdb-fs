@@ -116,12 +116,47 @@ public class FoundationLayer implements FoundationFileOperations {
       try {
         directoryLayer.open(rt, paths).get();
         if (directoryLayer.exists(rt, listDotPath).get()) {
-          return new DirectorySchema(path).getMetadata(directoryLayer, rt);
+          return getDirectoryMetadata(path, rt);
         } else {
           return new FileSchema(path).getMetadata(directoryLayer, rt);
         }
       } catch (Exception e) {return new Attr().setObjectType(ObjectType.NOT_FOUND); }
     });
+  }
+
+  private Optional<List<String>> loadDirectoryContents(String path) {
+    try {
+      return Optional.of(directoryLayer.list(db, parsePath(path)).get());
+    } catch (Exception e) {
+      return Optional.empty();
+    }
+  }
+
+  private Attr getDirectoryMetadata(String path, ReadTransaction rt) {
+    DirectoryCacheEntry entry = FsCacheSingleton.getDir(path)
+            .flatMap(storedEntry -> {
+              if (storedEntry.isCurrent(directoryLayer, rt)) {
+                return Optional.of(storedEntry);
+              } else {
+                return loadDirectoryContents(path)
+                        .map(children -> storedEntry.reload(directoryLayer, rt, children));
+              }
+            })
+            .orElseGet(() -> {
+              try {
+                return FsCacheSingleton.loadDirToCache(
+                        path,
+                        directoryLayer,
+                        rt,
+                        directoryLayer.list(rt, parsePath(path)).get());
+              } catch (Exception e) {
+                return null;
+              }
+            });
+
+    return entry != null
+            ? entry.getMetadata()
+            : new Attr().setObjectType(ObjectType.NOT_FOUND);
   }
 
   @Override

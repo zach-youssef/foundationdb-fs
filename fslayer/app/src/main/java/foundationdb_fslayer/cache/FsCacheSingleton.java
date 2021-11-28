@@ -30,9 +30,10 @@ public class FsCacheSingleton {
         return FILE_CACHE.containsKey(path);
     }
 
-    public static void loadDirToCache(String path, DirectoryLayer directoryLayer, ReadTransaction rt, List<String> children) {
+    public static DirectoryCacheEntry loadDirToCache(String path, DirectoryLayer directoryLayer, ReadTransaction rt, List<String> children) {
         DirectorySchema schema = new DirectorySchema(path);
         DIR_CACHE.put(path, DirectoryCacheEntry.loadFromDB(children, schema, directoryLayer, rt));
+        return DIR_CACHE.get(path);
     }
 
     public static void removeDirFromCache(String path) {
