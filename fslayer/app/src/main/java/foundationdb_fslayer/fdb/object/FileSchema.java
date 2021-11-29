@@ -269,7 +269,11 @@ public class FileSchema extends AbstractSchema {
      * Set the mode of this file (chmod)
      * Returns false if fails
      */
-    public boolean setMode(DirectoryLayer directoryLayer, Transaction transaction, long mode) {
+    public boolean setMode(DirectoryLayer directoryLayer, Transaction transaction, long mode, long userId) {
+        if (getCache(directoryLayer, transaction).getMetadata().getUid() != userId) {
+            return false;
+        }
+
         try {
             DirectorySubspace filespace = directoryLayer.open(transaction, path).get();
             transaction.set(filespace.pack(Metadata.MODE), Tuple.from(mode).pack());

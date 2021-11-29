@@ -178,8 +178,8 @@ public class FoundationLayer implements FoundationFileOperations {
 
   @Override
   // TODO check if file or directory, then set mode accordingly
-  public boolean chmod(String path, long mode) {
-    return dbWrite(tr -> new FileSchema(path).setMode(directoryLayer, tr, mode));
+  public boolean chmod(String path, long mode, long userId) {
+    return dbWrite(tr -> new FileSchema(path).setMode(directoryLayer, tr, mode, userId));
   }
 
   @Override

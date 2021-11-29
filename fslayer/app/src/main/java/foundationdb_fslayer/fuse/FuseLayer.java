@@ -125,8 +125,8 @@ public class FuseLayer extends FuseStubFS {
   @Override
   public int mknod(String path, long mode, long rdev) {
     return (dbOps.createFile(path)
-            && dbOps.chmod(path, mode)
             && dbOps.chown(path, userId, 0)
+            && dbOps.chmod(path, mode, userId)
             && dbOps.setFileTime(System.currentTimeMillis(), path))
             ? 0
             : -ErrorCodes.ENOENT();
@@ -150,7 +150,7 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int chmod(String path, long mode) {
-    return dbOps.chmod(path, mode) ? 0 : -ErrorCodes.ENOENT();
+    return dbOps.chmod(path, mode, userId) ? 0 : -ErrorCodes.EACCES();
   }
 
   @Override

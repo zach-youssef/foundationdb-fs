@@ -97,7 +97,7 @@ public interface FoundationFileOperations {
   /**
    *  Sets a file's mode to the given value
    */
-  boolean chmod(String path, long mode);
+  boolean chmod(String path, long mode, long userId);
 
   /**
    *  Set the UID / GID of the file for linux
