@@ -92,7 +92,7 @@ public interface FoundationFileOperations {
    *  Sets a file's size to the given length
    *  Will delete data on shrink, and do nothing on grow
    */
-  boolean truncate(String path, long size);
+  boolean truncate(String path, long size, long userId);
 
   /**
    *  Sets a file's mode to the given value

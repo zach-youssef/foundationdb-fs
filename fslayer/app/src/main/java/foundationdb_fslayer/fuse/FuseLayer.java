@@ -145,7 +145,7 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int truncate(String path, long size) {
-    return dbOps.truncate(path,size) ? 0 : -ErrorCodes.ENOENT();
+    return dbOps.truncate(path,size, userId) ? 0 : -ErrorCodes.EACCES();
   }
 
   @Override

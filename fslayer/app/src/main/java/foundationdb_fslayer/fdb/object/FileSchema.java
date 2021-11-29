@@ -299,7 +299,10 @@ public class FileSchema extends AbstractSchema {
         }
     }
 
-    public boolean truncate(DirectoryLayer directoryLayer, Transaction transaction, long size) {
+    public boolean truncate(DirectoryLayer directoryLayer, Transaction transaction, long size, long userId) {
+        if (!modifyPermitted(directoryLayer, transaction, userId)) {
+            return false;
+        }
         // Calculate how much we need to delete
         int currentSize = this.size(directoryLayer, transaction);
         int bytesToDelete = currentSize - (int) size;

@@ -172,8 +172,8 @@ public class FoundationLayer implements FoundationFileOperations {
   }
 
   @Override
-  public boolean truncate(String path, long size) {
-    return dbWrite(tr -> new FileSchema(path).truncate(directoryLayer, tr, size));
+  public boolean truncate(String path, long size, long userId) {
+    return dbWrite(tr -> new FileSchema(path).truncate(directoryLayer, tr, size, userId));
   }
 
   @Override
