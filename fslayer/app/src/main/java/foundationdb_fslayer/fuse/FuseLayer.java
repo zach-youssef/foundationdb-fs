@@ -160,6 +160,6 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int chown(String path, long uid, long gid) {
-    return dbOps.chown(path, uid, gid) ? 0 : -ErrorCodes.ENOENT();
+    return -ErrorCodes.EACCES();
   }
 }
