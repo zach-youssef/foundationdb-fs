@@ -2,8 +2,10 @@ package foundationdb_fslayer.fdb;
 
 import com.apple.foundationdb.directory.DirectorySubspace;
 import foundationdb_fslayer.fdb.object.Attr;
+import foundationdb_fslayer.permissions.PermissionManager;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface FoundationFileOperations {
   /**
@@ -104,4 +106,6 @@ public interface FoundationFileOperations {
   int open(String path, int flags);
 
   void initRootIfNeeded();
+
+  Optional<PermissionManager> login(String username, String password);
 }

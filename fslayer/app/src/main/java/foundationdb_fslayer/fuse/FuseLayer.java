@@ -16,9 +16,11 @@ import java.util.List;
 public class FuseLayer extends FuseStubFS {
 
   private final FoundationFileOperations dbOps;
+  private final long userId;
 
-  public FuseLayer(FoundationFileOperations dbOps) {
+  public FuseLayer(FoundationFileOperations dbOps, long userId) {
     this.dbOps = dbOps;
+    this.userId = userId;
   }
 
   @Override

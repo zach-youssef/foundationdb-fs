@@ -7,24 +7,40 @@ import com.apple.foundationdb.FDB;
 import foundationdb_fslayer.fdb.FoundationFileOperations;
 import foundationdb_fslayer.fdb.FoundationLayer;
 import foundationdb_fslayer.fuse.FuseLayer;
+import foundationdb_fslayer.permissions.PermissionManager;
 
 import java.nio.file.Paths;
+import java.util.Optional;
+import java.util.Scanner;
 
 public class App {
 
 
   public static void main(String[] args) {
     FoundationFileOperations dbOps = new FoundationLayer(630);
-    FuseLayer fuseLayer = new FuseLayer(dbOps);
 
     dbOps.initRootIfNeeded();
 
-    try {
-      fuseLayer.mount(Paths.get(args[0]), true, true);
-    } finally {
-      fuseLayer.umount();
-    }
+    login(dbOps).ifPresent(pm -> {
+        FuseLayer fuseLayer = new FuseLayer(dbOps, pm.getId());
 
+        try {
+          fuseLayer.mount(Paths.get(args[0]), true, true);
+        } finally {
+          fuseLayer.umount();
+        }
+      });
+
+  }
+
+  private static Optional<PermissionManager> login(FoundationFileOperations db) {
+    Scanner in = new Scanner(System.in);
+    System.out.print("Username: ");
+    String username = in.nextLine();
+    System.out.print("Password: ");
+    String password = String.valueOf(System.console().readPassword());
+
+    return db.login(username, password);
   }
 
 }

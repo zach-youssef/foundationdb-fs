@@ -9,6 +9,7 @@ import foundationdb_fslayer.fdb.object.Attr;
 import foundationdb_fslayer.fdb.object.DirectorySchema;
 import foundationdb_fslayer.fdb.object.FileSchema;
 import foundationdb_fslayer.fdb.object.ObjectType;
+import foundationdb_fslayer.permissions.PermissionManager;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -207,5 +208,10 @@ public class FoundationLayer implements FoundationFileOperations {
       }
       return null;
     });
+  }
+
+  @Override
+  public Optional<PermissionManager> login(String username, String password) {
+    return dbWrite(tr -> PermissionManager.login(username, password, directoryLayer, tr));
   }
 }
