@@ -36,7 +36,7 @@ public class fdbTest {
   @Test
   public void testRead() {
     // Write some data to test read
-    fsLayer.createFile("/junit_test/hello");
+    fsLayer.createFile("/junit_test/hello", );
     fsLayer.write("/junit_test/hello", "world".getBytes());
 
     // Assert the read is correct
@@ -50,7 +50,7 @@ public class fdbTest {
   @Test
   public void testClearFileContent() {
     // Create a file to delete
-    fsLayer.createFile("/junit_test/delete_me");
+    fsLayer.createFile("/junit_test/delete_me", );
     fsLayer.write("/junit_test/delete_me", new byte[1], 0);
 
     // Delete the file
@@ -64,7 +64,7 @@ public class fdbTest {
   public void testWrite() {
     // create new file
     String filePath = "/junit_test/file";
-    fsLayer.createFile(filePath);
+    fsLayer.createFile(filePath, );
 
     // Write to file
     String startPhrase = "start writing to file";
@@ -89,7 +89,7 @@ public class fdbTest {
   public void testReadOffsetSize(){
     // create new file
     String filepath = "/file";
-    fsLayer.createFile(filepath);
+    fsLayer.createFile(filepath, );
 
     // Write to the file
     String data = "We want to read just THIS, not anything else";
@@ -135,7 +135,7 @@ public class fdbTest {
     List<String> filenames = Arrays.asList("a.txt", "b.png", "c.mp4");
     for (String filename : filenames) {
       String filepath = testPath + "/" + filename;
-      fsLayer.createFile(filepath);
+      fsLayer.createFile(filepath, );
       fsLayer.write(filepath, new byte[1],0);
     }
 

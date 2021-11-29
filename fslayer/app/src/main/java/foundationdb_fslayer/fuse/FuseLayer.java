@@ -90,12 +90,12 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int mkdir(String path, long mode) {
-    return dbOps.mkdir(path, mode, userId) == null ? -ErrorCodes.ENOENT() : 0;
+    return dbOps.mkdir(path, mode, userId) == null ? -ErrorCodes.EACCES() : 0;
   }
 
   @Override
   public int rmdir(String path) {
-    return dbOps.rmdir(path) ? 0 : -ErrorCodes.ENOENT();
+    return dbOps.rmdir(path, userId) ? 0 : -ErrorCodes.EACCES();
   }
 
   @Override
@@ -126,7 +126,7 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int mknod(String path, long mode, long rdev) {
-    return (dbOps.createFile(path)
+    return (dbOps.createFile(path, userId)
             && dbOps.chown(path, userId, 0)
             && dbOps.chmod(path, mode, userId)
             && dbOps.setFileTime(System.currentTimeMillis(), path))
@@ -141,8 +141,7 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int unlink(String path){
-    dbOps.clearFileContent(path);
-    return 0;
+    return dbOps.clearFileContent(path, userId) ? 0 : -ErrorCodes.EACCES();
   }
 
   @Override

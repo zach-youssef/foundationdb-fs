@@ -48,17 +48,24 @@ public class FoundationLayer implements FoundationFileOperations {
   }
 
   @Override
-  public boolean rmdir(String path) {
+  public boolean rmdir(String path, long uid) {
     DirectorySchema dir = new DirectorySchema(path);
 
-    return dbWrite(transaction -> dir.delete(directoryLayer, transaction));
+    return dbWrite(transaction ->
+            canNodeBeCreatedOrRemoved(transaction, path, uid)
+                    && dir.delete(directoryLayer, transaction));
   }
 
   @Override
   public DirectorySubspace mkdir(String path, long mode, long uid) {
     DirectorySchema dir = new DirectorySchema(path);
 
-    return dbWrite(transaction -> dir.create(directoryLayer, transaction, mode, uid));
+    return dbWrite(transaction -> {
+      if (!canNodeBeCreatedOrRemoved(transaction, path, uid)) {
+        return null;
+      }
+      return dir.create(directoryLayer, transaction, mode, uid);
+    });
   }
 
 
@@ -108,15 +115,19 @@ public class FoundationLayer implements FoundationFileOperations {
     return Util.checkPermission(attr.getMode(), attr.getUid(), userId, userMask, otherMask);
   }
 
-  public void clearFileContent(String filepath) {
+  public boolean clearFileContent(String filepath, long userId) {
     FileSchema file = new FileSchema(filepath);
-    dbWrite(transaction -> file.delete(directoryLayer, transaction));
+    return dbWrite(transaction ->
+            canNodeBeCreatedOrRemoved(transaction, filepath, userId)
+                    && file.delete(directoryLayer, transaction));
   }
 
   @Override
-  public boolean createFile(String path) {
+  public boolean createFile(String path, long userId) {
     FileSchema file = new FileSchema(path);
-    return dbWrite(transaction -> file.create(directoryLayer, transaction));
+    return dbWrite(transaction ->
+            canNodeBeCreatedOrRemoved(transaction, path, userId)
+                    && file.create(directoryLayer, transaction));
   }
 
   @Override
@@ -242,5 +253,21 @@ public class FoundationLayer implements FoundationFileOperations {
   @Override
   public Optional<PermissionManager> login(String username, String password) {
     return dbWrite(tr -> PermissionManager.login(username, password, directoryLayer, tr));
+  }
+
+  private boolean canNodeBeCreatedOrRemoved(ReadTransaction rt, String targetPath, long userId) {
+    // A node can be created or removed if the user has permissions to write to the parent directory
+
+    // So, let's first grab the parent directory.
+    String parentPath = targetPath.substring(0, targetPath.lastIndexOf("/"));
+
+    // Everyone has access to the root directory
+    if (parentPath.equals("")) {
+      return true;
+    }
+
+    // Return true if the user can both read and write to that directory
+    return checkDirectoryPermission(parentPath, rt, userId, 0200, 0002)
+            && checkDirectoryPermission(parentPath, rt, userId, 0400, 0004);
   }
 }

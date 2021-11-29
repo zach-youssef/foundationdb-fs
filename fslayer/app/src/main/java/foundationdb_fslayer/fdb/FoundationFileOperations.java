@@ -40,7 +40,7 @@ public interface FoundationFileOperations {
    * @param path list of path strings
    * @return a boolean value determining whether removing the directory is successful
    */
-  boolean rmdir(String path);
+  boolean rmdir(String path, long uid);
 
   /**
    * Create a new directory matching the provided path under the given directory.
@@ -63,13 +63,13 @@ public interface FoundationFileOperations {
    *
    * @param file file path
    */
-  void clearFileContent(String file);
+  boolean clearFileContent(String file, long userId);
 
   /**
    * Creates a new empty file at the given path
    * returns false on failure
    */
-  boolean createFile(String path);
+  boolean createFile(String path, long userId);
 
 
   /**
@@ -110,4 +110,5 @@ public interface FoundationFileOperations {
   void initRootIfNeeded();
 
   Optional<PermissionManager> login(String username, String password);
+
 }
