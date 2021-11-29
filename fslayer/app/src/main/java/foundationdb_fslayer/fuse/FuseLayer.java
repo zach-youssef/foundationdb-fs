@@ -45,7 +45,8 @@ public class FuseLayer extends FuseStubFS {
         stat.st_mtim.tv_nsec.set(0);
         break;
       case DIRECTORY:
-        stat.st_mode.set(FileStat.S_IFDIR | 0755); // TODO set file mode, UID, GID
+        stat.st_mode.set(FileStat.S_IFDIR | attr.getMode());
+        stat.st_uid.set(attr.getUid());
         stat.st_nlink.set(2);
         break;
       case NOT_FOUND:
@@ -87,7 +88,7 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int mkdir(String path, long mode) {
-    return dbOps.mkdir(path) == null ? -ErrorCodes.ENOENT() : 0;
+    return dbOps.mkdir(path, mode, userId) == null ? -ErrorCodes.ENOENT() : 0;
   }
 
   @Override
@@ -97,7 +98,6 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int read(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
-    int version = fi.fh.intValue();
     byte[] stored = dbOps.read(path, offset, size, userId);
 
     if (stored == null) {

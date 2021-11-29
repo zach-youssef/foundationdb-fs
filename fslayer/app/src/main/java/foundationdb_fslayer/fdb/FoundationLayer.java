@@ -54,10 +54,10 @@ public class FoundationLayer implements FoundationFileOperations {
   }
 
   @Override
-  public DirectorySubspace mkdir(String path) {
+  public DirectorySubspace mkdir(String path, long mode, long uid) {
     DirectorySchema dir = new DirectorySchema(path);
 
-    return dbWrite(transaction -> dir.create(directoryLayer, transaction));
+    return dbWrite(transaction -> dir.create(directoryLayer, transaction, mode, uid));
   }
 
 

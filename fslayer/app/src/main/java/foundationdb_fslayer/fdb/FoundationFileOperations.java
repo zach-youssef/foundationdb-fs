@@ -48,7 +48,7 @@ public interface FoundationFileOperations {
    * @param path list of path strings
    * @return The directory subspace of the newly created directory
    */
-  DirectorySubspace mkdir(String path);
+  DirectorySubspace mkdir(String path, long mode, long uid);
 
   /**
    * List all directories under the provided directory.
