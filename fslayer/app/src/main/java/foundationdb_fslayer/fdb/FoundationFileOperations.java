@@ -17,8 +17,8 @@ public interface FoundationFileOperations {
    */
   byte[] read(String path, long offset, long size, long userId);
 
-  default byte[] read(String path, int version){
-    return read(path, 0, getFileSize(path), version);
+  default byte[] read(String path, long userId){
+    return read(path, 0, getFileSize(path), userId);
   }
 
   /**

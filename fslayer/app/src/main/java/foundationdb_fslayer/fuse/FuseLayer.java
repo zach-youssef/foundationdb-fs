@@ -98,7 +98,12 @@ public class FuseLayer extends FuseStubFS {
   @Override
   public int read(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
     int version = fi.fh.intValue();
-    byte[] stored = dbOps.read(path, offset, size, version);
+    byte[] stored = dbOps.read(path, offset, size, userId);
+
+    if (stored == null) {
+      return -ErrorCodes.EACCES();
+    }
+
     buf.put(0, stored, 0, stored.length);
     return stored.length;
   }

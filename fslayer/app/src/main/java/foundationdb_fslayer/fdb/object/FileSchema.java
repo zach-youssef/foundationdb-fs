@@ -87,6 +87,10 @@ public class FileSchema extends AbstractSchema {
      * Will return null on error.
      */
     public byte[] read(DirectoryLayer dir, ReadTransaction transaction, long offset, long size, long userId) {
+        if (!readPermitted(dir, transaction, userId)) {
+            return null;
+        }
+
         try {
             // Open the file's chunk space
             DirectorySubspace chunkSpace = dir.open(transaction, chunksPath).get();
@@ -349,20 +353,32 @@ public class FileSchema extends AbstractSchema {
     }
 
     private boolean modifyPermitted(DirectoryLayer directoryLayer, ReadTransaction rt, long userId) {
+        return checkPermission(directoryLayer, rt, userId, 0200, 0002);
+    }
+
+    private boolean readPermitted(DirectoryLayer directoryLayer, ReadTransaction rt, long userId) {
+        return checkPermission(directoryLayer, rt, userId, 0400, 0004);
+    }
+
+    private boolean checkPermission(DirectoryLayer directoryLayer,
+                                    ReadTransaction rt,
+                                    long userId,
+                                    long userMask,
+                                    long otherMask) {
         Attr metadata = getMetadata(directoryLayer, rt);
-        System.out.printf("This is the mode: %o\n", metadata.getMode());
+        System.out.printf("File Mode: %o\n", metadata.getMode());
         long mask;
         if (metadata.getUid() == userId) {
             System.out.println("User matches");
             // If this user owns the file, compare the owner permissions:
-            mask = 0200;
+            mask = userMask;
         } else {
             System.out.printf("User does not match: %d %d\n", metadata.getUid(), userId);
             // Otherwise, check the other permissions
-            mask = 0002;
+            mask = otherMask;
         }
         long ans = metadata.getMode() & mask;
-        System.out.printf("this is what I'm seeing %o\n", ans);
+        System.out.printf("Permission calculated: %o\n", ans);
         return ans != 0;
     }
 
