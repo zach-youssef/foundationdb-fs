@@ -3,6 +3,7 @@ package foundationdb_fslayer.fdb;
 import com.apple.foundationdb.*;
 import com.apple.foundationdb.directory.DirectoryLayer;
 import com.apple.foundationdb.directory.DirectorySubspace;
+import foundationdb_fslayer.Util;
 import foundationdb_fslayer.cache.DirectoryCacheEntry;
 import foundationdb_fslayer.cache.FsCacheSingleton;
 import foundationdb_fslayer.fdb.object.Attr;
@@ -70,7 +71,13 @@ public class FoundationLayer implements FoundationFileOperations {
 
 
   @Override
-  public List<String> ls(String path) {
+  public List<String> ls(String path, long userId) {
+    // Check if the user is allowed to read this directory
+    if (!path.equals("/")
+          && !dbRead(tr->checkDirectoryPermission(path, tr, userId, 0400, 0004))) {
+      return null;
+    }
+
     Optional<List<String>> cacheValue = dbRead(rt ->
             FsCacheSingleton.getDir(path).flatMap(entry ->
                     entry.isCurrent(directoryLayer, rt)
@@ -94,6 +101,11 @@ public class FoundationLayer implements FoundationFileOperations {
         return null;
       }
     });
+  }
+
+  private boolean checkDirectoryPermission(String dirPath, ReadTransaction rt, long userId, long userMask, long otherMask) {
+    Attr attr = getDirectoryMetadata(dirPath, rt);
+    return Util.checkPermission(attr.getMode(), attr.getUid(), userId, userMask, otherMask);
   }
 
   public void clearFileContent(String filepath) {

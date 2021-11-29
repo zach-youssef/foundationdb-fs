@@ -6,6 +6,7 @@ import com.apple.foundationdb.Transaction;
 import com.apple.foundationdb.directory.DirectoryLayer;
 import com.apple.foundationdb.directory.DirectorySubspace;
 import com.apple.foundationdb.tuple.Tuple;
+import foundationdb_fslayer.Util;
 import foundationdb_fslayer.cache.FileCacheEntry;
 import foundationdb_fslayer.cache.FsCacheSingleton;
 
@@ -373,20 +374,7 @@ public class FileSchema extends AbstractSchema {
                                     long userMask,
                                     long otherMask) {
         Attr metadata = getMetadata(directoryLayer, rt);
-        System.out.printf("File Mode: %o\n", metadata.getMode());
-        long mask;
-        if (metadata.getUid() == userId) {
-            System.out.println("User matches");
-            // If this user owns the file, compare the owner permissions:
-            mask = userMask;
-        } else {
-            System.out.printf("User does not match: %d %d\n", metadata.getUid(), userId);
-            // Otherwise, check the other permissions
-            mask = otherMask;
-        }
-        long ans = metadata.getMode() & mask;
-        System.out.printf("Permission calculated: %o\n", ans);
-        return ans != 0;
+        return Util.checkPermission(metadata.getMode(), metadata.getUid(), userId, userMask, otherMask);
     }
 
     public List<byte[]> loadChunks(DirectoryLayer directoryLayer, ReadTransaction rt) {

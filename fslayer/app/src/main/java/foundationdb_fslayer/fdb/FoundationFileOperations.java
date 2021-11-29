@@ -56,7 +56,7 @@ public interface FoundationFileOperations {
    * @param path list of path strings
    * @return a list of strings representing all sub-directories under the current directory
    */
-  List<String> ls(String path);
+  List<String> ls(String path, long userId);
 
   /**
    * Clear content of file

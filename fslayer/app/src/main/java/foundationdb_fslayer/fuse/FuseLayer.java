@@ -74,13 +74,15 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int readdir(String path, Pointer buf, FuseFillDir filter, long offset, FuseFileInfo fi) {
-    List<String> contents = dbOps.ls(path);
+    List<String> contents = dbOps.ls(path, userId);
 
     if (contents != null) {
       filter.apply(buf, ".", null, 0);
       filter.apply(buf, "..", null, 0);
 
       contents.forEach(item -> filter.apply(buf, item, null, 0));
+    } else {
+      return -ErrorCodes.EACCES();
     }
 
     return 0;
