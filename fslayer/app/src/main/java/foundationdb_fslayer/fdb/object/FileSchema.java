@@ -86,11 +86,7 @@ public class FileSchema extends AbstractSchema {
      * Reads the current value of the file.
      * Will return null on error.
      */
-    public byte[] read(DirectoryLayer dir, ReadTransaction transaction, long offset, long size, int version) {
-        if (!modifyPermitted(dir, transaction, version)) {
-            return null;
-        }
-
+    public byte[] read(DirectoryLayer dir, ReadTransaction transaction, long offset, long size, long userId) {
         try {
             // Open the file's chunk space
             DirectorySubspace chunkSpace = dir.open(transaction, chunksPath).get();
@@ -137,8 +133,8 @@ public class FileSchema extends AbstractSchema {
      * Appends the given bytes to the file.
      * Returns false if an error occurs.
      */
-    public boolean write(DirectoryLayer dir, Transaction transaction, byte[] data, long offset, int version) {
-        if (!modifyPermitted(dir, transaction, version)) {
+    public boolean write(DirectoryLayer dir, Transaction transaction, byte[] data, long offset, long userId) {
+        if (!modifyPermitted(dir, transaction, userId)) {
             return false;
         }
 
@@ -350,21 +346,24 @@ public class FileSchema extends AbstractSchema {
 
     public int open(DirectoryLayer directoryLayer, Transaction tr, int flags) {
         return (int) getVersion(directoryLayer, tr);
-
-        /*
-        if ((flags | OpenFlags.O_CREAT.intValue()) != 0
-                && this.getVersion(directoryLayer, tr) < 0) {
-            this.create(directoryLayer, tr);
-        }
-
-        return (int) incrementVersion(directoryLayer, tr);
-        */
     }
 
-    private boolean modifyPermitted(DirectoryLayer directoryLayer, ReadTransaction rt, int version) {
-        // System.err.println("VERSION: ");
-        // return version == (int) getVersion(directoryLayer, rt);
-        return true;
+    private boolean modifyPermitted(DirectoryLayer directoryLayer, ReadTransaction rt, long userId) {
+        Attr metadata = getMetadata(directoryLayer, rt);
+        System.out.printf("This is the mode: %o\n", metadata.getMode());
+        long mask;
+        if (metadata.getUid() == userId) {
+            System.out.println("User matches");
+            // If this user owns the file, compare the owner permissions:
+            mask = 0200;
+        } else {
+            System.out.printf("User does not match: %d %d\n", metadata.getUid(), userId);
+            // Otherwise, check the other permissions
+            mask = 0002;
+        }
+        long ans = metadata.getMode() & mask;
+        System.out.printf("this is what I'm seeing %o\n", ans);
+        return ans != 0;
     }
 
     public List<byte[]> loadChunks(DirectoryLayer directoryLayer, ReadTransaction rt) {

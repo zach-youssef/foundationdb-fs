@@ -108,16 +108,20 @@ public class FuseLayer extends FuseStubFS {
     byte[] data = new byte[(int) size];
     buf.get(0, data, 0, (int) size);
 
-    dbOps.write(path, data, offset, fi.fh.intValue());
-    dbOps.setFileTime(System.currentTimeMillis(), path);
+    if (dbOps.write(path, data, offset, userId)) {
+      dbOps.setFileTime(System.currentTimeMillis(), path);
 
-    return (int) size;
+      return (int) size;
+    } else {
+      return -ErrorCodes.EACCES();
+    }
   }
 
   @Override
   public int mknod(String path, long mode, long rdev) {
     return (dbOps.createFile(path)
             && dbOps.chmod(path, mode)
+            && dbOps.chown(path, userId, 0)
             && dbOps.setFileTime(System.currentTimeMillis(), path))
             ? 0
             : -ErrorCodes.ENOENT();

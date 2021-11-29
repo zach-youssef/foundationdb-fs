@@ -12,9 +12,10 @@ public interface FoundationFileOperations {
    * Read a file.
    *
    * @param path file path
+   * @param userId
    * @return encoded byte representation of the file content
    */
-  byte[] read(String path, long offset, long size, int version);
+  byte[] read(String path, long offset, long size, long userId);
 
   default byte[] read(String path, int version){
     return read(path, 0, getFileSize(path), version);
@@ -22,14 +23,15 @@ public interface FoundationFileOperations {
 
   /**
    * Write to a file
-   *
    * @param path file path
    * @param data data to be added to file
+   * @param userId
+   * @return
    */
-  void write(String path, byte[] data, long offset, int version);
+  boolean write(String path, byte[] data, long offset, long userId);
 
-  default void write(String path, byte[] data, int version){
-    write(path, data, 0, version);
+  default boolean write(String path, byte[] data, int version){
+    return write(path, data, 0, version);
   }
 
   /**

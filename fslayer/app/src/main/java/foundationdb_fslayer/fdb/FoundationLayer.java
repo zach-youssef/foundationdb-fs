@@ -40,10 +40,10 @@ public class FoundationLayer implements FoundationFileOperations {
   }
 
   @Override
-  public byte[] read(String path, long offset, long size, int version) {
+  public byte[] read(String path, long offset, long size, long userId) {
     FileSchema file = new FileSchema(path);
 
-    return dbRead(transaction -> file.read(directoryLayer, transaction, offset, size, version));
+    return dbRead(transaction -> file.read(directoryLayer, transaction, offset, size, userId));
   }
 
   @Override
@@ -62,10 +62,10 @@ public class FoundationLayer implements FoundationFileOperations {
 
 
   @Override
-  public void write(String path, byte[] data, long offset, int version) {
+  public boolean write(String path, byte[] data, long offset, long userId) {
     FileSchema file = new FileSchema(path);
 
-    dbWrite(transaction -> file.write(directoryLayer, transaction, data, offset, version));
+    return dbWrite(transaction -> file.write(directoryLayer, transaction, data, offset, userId));
   }
 
 

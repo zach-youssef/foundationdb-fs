@@ -26,7 +26,9 @@ public class PermissionManager {
     private static final List<String> ID_MAP_PATH = Arrays.asList(".", "IDMAP");
     private static final String ID_COUNTER_KEY = "ID_COUNTER";
 
-    private long currentUserId;
+    private static final long INITIAL_ID = 70000;
+
+    private final long currentUserId;
 
     private PermissionManager(long id) {
         this.currentUserId = id;
@@ -92,7 +94,7 @@ public class PermissionManager {
             byte[] rawCounterVal = tr.get(rootSpace.pack(ID_COUNTER_KEY)).get();
             long currentCount ;
             if (rawCounterVal == null) {
-                currentCount = 0;
+                currentCount = INITIAL_ID;
             } else {
                 currentCount = Tuple.fromBytes(rawCounterVal).getLong(0);
             }

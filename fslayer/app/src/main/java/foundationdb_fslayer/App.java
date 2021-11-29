@@ -22,6 +22,8 @@ public class App {
     dbOps.initRootIfNeeded();
 
     login(dbOps).ifPresent(pm -> {
+        System.out.println("Logged in (ID " + pm.getId() + ").");
+
         FuseLayer fuseLayer = new FuseLayer(dbOps, pm.getId());
 
         try {
