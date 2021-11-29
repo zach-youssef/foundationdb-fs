@@ -109,20 +109,30 @@ public class FoundationLayer implements FoundationFileOperations {
 
   @Override
   public Attr getAttr(String path) {
-    List<String> paths = parsePath(path);
-    List<String> listDotPath = new ArrayList<>(paths);
-    listDotPath.add(DirectorySchema.Metadata.META_ROOT);
-
     return dbRead(rt -> {
-      try {
-        directoryLayer.open(rt, paths).get();
-        if (directoryLayer.exists(rt, listDotPath).get()) {
+      Optional<Boolean> isDir = isDirectory(path, rt);
+      if (isDir.isPresent()) {
+        if (isDir.get()) {
           return getDirectoryMetadata(path, rt);
         } else {
           return new FileSchema(path).getMetadata(directoryLayer, rt);
         }
-      } catch (Exception e) {return new Attr().setObjectType(ObjectType.NOT_FOUND); }
+      } else {
+        return new Attr().setObjectType(ObjectType.NOT_FOUND);
+      }
     });
+  }
+
+  private Optional<Boolean> isDirectory(String path, ReadTransaction rt) {
+    List<String> paths = parsePath(path);
+    List<String> listDotPath = new ArrayList<>(paths);
+    listDotPath.add(DirectorySchema.Metadata.META_ROOT);
+    try {
+      directoryLayer.open(rt, paths).get();
+      return Optional.of(directoryLayer.exists(rt, listDotPath).get());
+    } catch (Exception e) {
+      return Optional.empty();
+    }
   }
 
   private Optional<List<String>> loadDirectoryContents(String path) {
@@ -179,7 +189,14 @@ public class FoundationLayer implements FoundationFileOperations {
   @Override
   // TODO check if file or directory, then set mode accordingly
   public boolean chmod(String path, long mode, long userId) {
-    return dbWrite(tr -> new FileSchema(path).setMode(directoryLayer, tr, mode, userId));
+    return dbWrite(tr -> isDirectory(path, tr).map(isDir -> {
+      if (isDir) {
+        return getDirectoryMetadata(path, tr).getUid() == userId
+                && new DirectorySchema(path).setMode(directoryLayer, tr, mode);
+      } else {
+        return new FileSchema(path).setMode(directoryLayer, tr, mode, userId);
+      }
+    }).orElse(false));
   }
 
   @Override

@@ -19,6 +19,7 @@ public class DirectorySchema extends AbstractSchema{
     private final List<String> metadataPath;
     private String rawPath;
 
+
     public static class Metadata {
         public final static String META_ROOT = ".";
         public final static String VERSION = "VERSION";
@@ -88,6 +89,17 @@ public class DirectorySchema extends AbstractSchema{
             transaction.clear(getMetadataSpace(dir, transaction).range());
             dir.removeIfExists(transaction, metadataPath).get();
             incrementParentVersion(dir, transaction);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public boolean setMode(DirectoryLayer directoryLayer, Transaction tr, long mode) {
+        try {
+            DirectorySubspace metaSpace = getMetadataSpace(directoryLayer, tr);
+            tr.set(metaSpace.pack(Metadata.MODE), Tuple.from(mode).pack());
+            incrementVersion(directoryLayer, tr);
             return true;
         } catch (Exception e) {
             return false;
