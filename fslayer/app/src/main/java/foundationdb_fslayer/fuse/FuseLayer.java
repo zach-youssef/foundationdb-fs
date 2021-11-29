@@ -16,9 +16,11 @@ import java.util.List;
 public class FuseLayer extends FuseStubFS {
 
   private final FoundationFileOperations dbOps;
+  private final long userId;
 
-  public FuseLayer(FoundationFileOperations dbOps) {
+  public FuseLayer(FoundationFileOperations dbOps, long userId) {
     this.dbOps = dbOps;
+    this.userId = userId;
   }
 
   @Override
@@ -43,7 +45,8 @@ public class FuseLayer extends FuseStubFS {
         stat.st_mtim.tv_nsec.set(0);
         break;
       case DIRECTORY:
-        stat.st_mode.set(FileStat.S_IFDIR | 0755); // TODO set file mode, UID, GID
+        stat.st_mode.set(FileStat.S_IFDIR | attr.getMode());
+        stat.st_uid.set(attr.getUid());
         stat.st_nlink.set(2);
         break;
       case NOT_FOUND:
@@ -71,13 +74,15 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int readdir(String path, Pointer buf, FuseFillDir filter, long offset, FuseFileInfo fi) {
-    List<String> contents = dbOps.ls(path);
+    List<String> contents = dbOps.ls(path, userId);
 
     if (contents != null) {
       filter.apply(buf, ".", null, 0);
       filter.apply(buf, "..", null, 0);
 
       contents.forEach(item -> filter.apply(buf, item, null, 0));
+    } else {
+      return -ErrorCodes.EACCES();
     }
 
     return 0;
@@ -85,18 +90,22 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int mkdir(String path, long mode) {
-    return dbOps.mkdir(path) == null ? -ErrorCodes.ENOENT() : 0;
+    return dbOps.mkdir(path, mode, userId) == null ? -ErrorCodes.EACCES() : 0;
   }
 
   @Override
   public int rmdir(String path) {
-    return dbOps.rmdir(path) ? 0 : -ErrorCodes.ENOENT();
+    return dbOps.rmdir(path, userId) ? 0 : -ErrorCodes.EACCES();
   }
 
   @Override
   public int read(String path, Pointer buf, long size, long offset, FuseFileInfo fi) {
-    int version = fi.fh.intValue();
-    byte[] stored = dbOps.read(path, offset, size, version);
+    byte[] stored = dbOps.read(path, offset, size, userId);
+
+    if (stored == null) {
+      return -ErrorCodes.EACCES();
+    }
+
     buf.put(0, stored, 0, stored.length);
     return stored.length;
   }
@@ -106,16 +115,20 @@ public class FuseLayer extends FuseStubFS {
     byte[] data = new byte[(int) size];
     buf.get(0, data, 0, (int) size);
 
-    dbOps.write(path, data, offset, fi.fh.intValue());
-    dbOps.setFileTime(System.currentTimeMillis(), path);
+    if (dbOps.write(path, data, offset, userId)) {
+      dbOps.setFileTime(System.currentTimeMillis(), path);
 
-    return (int) size;
+      return (int) size;
+    } else {
+      return -ErrorCodes.EACCES();
+    }
   }
 
   @Override
   public int mknod(String path, long mode, long rdev) {
-    return (dbOps.createFile(path)
-            && dbOps.chmod(path, mode)
+    return (dbOps.createFile(path, userId)
+            && dbOps.chown(path, userId, 0)
+            && dbOps.chmod(path, mode, userId)
             && dbOps.setFileTime(System.currentTimeMillis(), path))
             ? 0
             : -ErrorCodes.ENOENT();
@@ -128,18 +141,17 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int unlink(String path){
-    dbOps.clearFileContent(path);
-    return 0;
+    return dbOps.clearFileContent(path, userId) ? 0 : -ErrorCodes.EACCES();
   }
 
   @Override
   public int truncate(String path, long size) {
-    return dbOps.truncate(path,size) ? 0 : -ErrorCodes.ENOENT();
+    return dbOps.truncate(path,size, userId) ? 0 : -ErrorCodes.EACCES();
   }
 
   @Override
   public int chmod(String path, long mode) {
-    return dbOps.chmod(path, mode) ? 0 : -ErrorCodes.ENOENT();
+    return dbOps.chmod(path, mode, userId) ? 0 : -ErrorCodes.EACCES();
   }
 
   @Override
@@ -149,6 +161,6 @@ public class FuseLayer extends FuseStubFS {
 
   @Override
   public int chown(String path, long uid, long gid) {
-    return dbOps.chown(path, uid, gid) ? 0 : -ErrorCodes.ENOENT();
+    return -ErrorCodes.EACCES();
   }
 }

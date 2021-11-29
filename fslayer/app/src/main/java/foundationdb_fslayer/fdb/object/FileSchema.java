@@ -6,6 +6,7 @@ import com.apple.foundationdb.Transaction;
 import com.apple.foundationdb.directory.DirectoryLayer;
 import com.apple.foundationdb.directory.DirectorySubspace;
 import com.apple.foundationdb.tuple.Tuple;
+import foundationdb_fslayer.Util;
 import foundationdb_fslayer.cache.FileCacheEntry;
 import foundationdb_fslayer.cache.FsCacheSingleton;
 
@@ -86,8 +87,8 @@ public class FileSchema extends AbstractSchema {
      * Reads the current value of the file.
      * Will return null on error.
      */
-    public byte[] read(DirectoryLayer dir, ReadTransaction transaction, long offset, long size, int version) {
-        if (!modifyPermitted(dir, transaction, version)) {
+    public byte[] read(DirectoryLayer dir, ReadTransaction transaction, long offset, long size, long userId) {
+        if (!readPermitted(dir, transaction, userId)) {
             return null;
         }
 
@@ -137,8 +138,8 @@ public class FileSchema extends AbstractSchema {
      * Appends the given bytes to the file.
      * Returns false if an error occurs.
      */
-    public boolean write(DirectoryLayer dir, Transaction transaction, byte[] data, long offset, int version) {
-        if (!modifyPermitted(dir, transaction, version)) {
+    public boolean write(DirectoryLayer dir, Transaction transaction, byte[] data, long offset, long userId) {
+        if (!modifyPermitted(dir, transaction, userId)) {
             return false;
         }
 
@@ -269,7 +270,11 @@ public class FileSchema extends AbstractSchema {
      * Set the mode of this file (chmod)
      * Returns false if fails
      */
-    public boolean setMode(DirectoryLayer directoryLayer, Transaction transaction, long mode) {
+    public boolean setMode(DirectoryLayer directoryLayer, Transaction transaction, long mode, long userId) {
+        if (getCache(directoryLayer, transaction).getMetadata().getUid() != userId) {
+            return false;
+        }
+
         try {
             DirectorySubspace filespace = directoryLayer.open(transaction, path).get();
             transaction.set(filespace.pack(Metadata.MODE), Tuple.from(mode).pack());
@@ -295,7 +300,10 @@ public class FileSchema extends AbstractSchema {
         }
     }
 
-    public boolean truncate(DirectoryLayer directoryLayer, Transaction transaction, long size) {
+    public boolean truncate(DirectoryLayer directoryLayer, Transaction transaction, long size, long userId) {
+        if (!modifyPermitted(directoryLayer, transaction, userId)) {
+            return false;
+        }
         // Calculate how much we need to delete
         int currentSize = this.size(directoryLayer, transaction);
         int bytesToDelete = currentSize - (int) size;
@@ -350,21 +358,23 @@ public class FileSchema extends AbstractSchema {
 
     public int open(DirectoryLayer directoryLayer, Transaction tr, int flags) {
         return (int) getVersion(directoryLayer, tr);
-
-        /*
-        if ((flags | OpenFlags.O_CREAT.intValue()) != 0
-                && this.getVersion(directoryLayer, tr) < 0) {
-            this.create(directoryLayer, tr);
-        }
-
-        return (int) incrementVersion(directoryLayer, tr);
-        */
     }
 
-    private boolean modifyPermitted(DirectoryLayer directoryLayer, ReadTransaction rt, int version) {
-        // System.err.println("VERSION: ");
-        // return version == (int) getVersion(directoryLayer, rt);
-        return true;
+    private boolean modifyPermitted(DirectoryLayer directoryLayer, ReadTransaction rt, long userId) {
+        return checkPermission(directoryLayer, rt, userId, 0200, 0002);
+    }
+
+    private boolean readPermitted(DirectoryLayer directoryLayer, ReadTransaction rt, long userId) {
+        return checkPermission(directoryLayer, rt, userId, 0400, 0004);
+    }
+
+    private boolean checkPermission(DirectoryLayer directoryLayer,
+                                    ReadTransaction rt,
+                                    long userId,
+                                    long userMask,
+                                    long otherMask) {
+        Attr metadata = getMetadata(directoryLayer, rt);
+        return Util.checkPermission(metadata.getMode(), metadata.getUid(), userId, userMask, otherMask);
     }
 
     public List<byte[]> loadChunks(DirectoryLayer directoryLayer, ReadTransaction rt) {

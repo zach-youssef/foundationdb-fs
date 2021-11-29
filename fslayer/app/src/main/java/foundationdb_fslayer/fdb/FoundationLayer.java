@@ -3,12 +3,14 @@ package foundationdb_fslayer.fdb;
 import com.apple.foundationdb.*;
 import com.apple.foundationdb.directory.DirectoryLayer;
 import com.apple.foundationdb.directory.DirectorySubspace;
+import foundationdb_fslayer.Util;
 import foundationdb_fslayer.cache.DirectoryCacheEntry;
 import foundationdb_fslayer.cache.FsCacheSingleton;
 import foundationdb_fslayer.fdb.object.Attr;
 import foundationdb_fslayer.fdb.object.DirectorySchema;
 import foundationdb_fslayer.fdb.object.FileSchema;
 import foundationdb_fslayer.fdb.object.ObjectType;
+import foundationdb_fslayer.permissions.PermissionManager;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,37 +41,50 @@ public class FoundationLayer implements FoundationFileOperations {
   }
 
   @Override
-  public byte[] read(String path, long offset, long size, int version) {
+  public byte[] read(String path, long offset, long size, long userId) {
     FileSchema file = new FileSchema(path);
 
-    return dbRead(transaction -> file.read(directoryLayer, transaction, offset, size, version));
+    return dbRead(transaction -> file.read(directoryLayer, transaction, offset, size, userId));
   }
 
   @Override
-  public boolean rmdir(String path) {
+  public boolean rmdir(String path, long uid) {
     DirectorySchema dir = new DirectorySchema(path);
 
-    return dbWrite(transaction -> dir.delete(directoryLayer, transaction));
+    return dbWrite(transaction ->
+            canNodeBeCreatedOrRemoved(transaction, path, uid)
+                    && dir.delete(directoryLayer, transaction));
   }
 
   @Override
-  public DirectorySubspace mkdir(String path) {
+  public DirectorySubspace mkdir(String path, long mode, long uid) {
     DirectorySchema dir = new DirectorySchema(path);
 
-    return dbWrite(transaction -> dir.create(directoryLayer, transaction));
+    return dbWrite(transaction -> {
+      if (!canNodeBeCreatedOrRemoved(transaction, path, uid)) {
+        return null;
+      }
+      return dir.create(directoryLayer, transaction, mode, uid);
+    });
   }
 
 
   @Override
-  public void write(String path, byte[] data, long offset, int version) {
+  public boolean write(String path, byte[] data, long offset, long userId) {
     FileSchema file = new FileSchema(path);
 
-    dbWrite(transaction -> file.write(directoryLayer, transaction, data, offset, version));
+    return dbWrite(transaction -> file.write(directoryLayer, transaction, data, offset, userId));
   }
 
 
   @Override
-  public List<String> ls(String path) {
+  public List<String> ls(String path, long userId) {
+    // Check if the user is allowed to read this directory
+    if (!path.equals("/")
+          && !dbRead(tr->checkDirectoryPermission(path, tr, userId, 0400, 0004))) {
+      return null;
+    }
+
     Optional<List<String>> cacheValue = dbRead(rt ->
             FsCacheSingleton.getDir(path).flatMap(entry ->
                     entry.isCurrent(directoryLayer, rt)
@@ -95,33 +110,52 @@ public class FoundationLayer implements FoundationFileOperations {
     });
   }
 
-  public void clearFileContent(String filepath) {
+  private boolean checkDirectoryPermission(String dirPath, ReadTransaction rt, long userId, long userMask, long otherMask) {
+    Attr attr = getDirectoryMetadata(dirPath, rt);
+    return Util.checkPermission(attr.getMode(), attr.getUid(), userId, userMask, otherMask);
+  }
+
+  public boolean clearFileContent(String filepath, long userId) {
     FileSchema file = new FileSchema(filepath);
-    dbWrite(transaction -> file.delete(directoryLayer, transaction));
+    return dbWrite(transaction ->
+            canNodeBeCreatedOrRemoved(transaction, filepath, userId)
+                    && file.delete(directoryLayer, transaction));
   }
 
   @Override
-  public boolean createFile(String path) {
+  public boolean createFile(String path, long userId) {
     FileSchema file = new FileSchema(path);
-    return dbWrite(transaction -> file.create(directoryLayer, transaction));
+    return dbWrite(transaction ->
+            canNodeBeCreatedOrRemoved(transaction, path, userId)
+                    && file.create(directoryLayer, transaction));
   }
 
   @Override
   public Attr getAttr(String path) {
-    List<String> paths = parsePath(path);
-    List<String> listDotPath = new ArrayList<>(paths);
-    listDotPath.add(DirectorySchema.Metadata.META_ROOT);
-
     return dbRead(rt -> {
-      try {
-        directoryLayer.open(rt, paths).get();
-        if (directoryLayer.exists(rt, listDotPath).get()) {
+      Optional<Boolean> isDir = isDirectory(path, rt);
+      if (isDir.isPresent()) {
+        if (isDir.get()) {
           return getDirectoryMetadata(path, rt);
         } else {
           return new FileSchema(path).getMetadata(directoryLayer, rt);
         }
-      } catch (Exception e) {return new Attr().setObjectType(ObjectType.NOT_FOUND); }
+      } else {
+        return new Attr().setObjectType(ObjectType.NOT_FOUND);
+      }
     });
+  }
+
+  private Optional<Boolean> isDirectory(String path, ReadTransaction rt) {
+    List<String> paths = parsePath(path);
+    List<String> listDotPath = new ArrayList<>(paths);
+    listDotPath.add(DirectorySchema.Metadata.META_ROOT);
+    try {
+      directoryLayer.open(rt, paths).get();
+      return Optional.of(directoryLayer.exists(rt, listDotPath).get());
+    } catch (Exception e) {
+      return Optional.empty();
+    }
   }
 
   private Optional<List<String>> loadDirectoryContents(String path) {
@@ -171,14 +205,21 @@ public class FoundationLayer implements FoundationFileOperations {
   }
 
   @Override
-  public boolean truncate(String path, long size) {
-    return dbWrite(tr -> new FileSchema(path).truncate(directoryLayer, tr, size));
+  public boolean truncate(String path, long size, long userId) {
+    return dbWrite(tr -> new FileSchema(path).truncate(directoryLayer, tr, size, userId));
   }
 
   @Override
   // TODO check if file or directory, then set mode accordingly
-  public boolean chmod(String path, long mode) {
-    return dbWrite(tr -> new FileSchema(path).setMode(directoryLayer, tr, mode));
+  public boolean chmod(String path, long mode, long userId) {
+    return dbWrite(tr -> isDirectory(path, tr).map(isDir -> {
+      if (isDir) {
+        return getDirectoryMetadata(path, tr).getUid() == userId
+                && new DirectorySchema(path).setMode(directoryLayer, tr, mode);
+      } else {
+        return new FileSchema(path).setMode(directoryLayer, tr, mode, userId);
+      }
+    }).orElse(false));
   }
 
   @Override
@@ -207,5 +248,26 @@ public class FoundationLayer implements FoundationFileOperations {
       }
       return null;
     });
+  }
+
+  @Override
+  public Optional<PermissionManager> login(String username, String password) {
+    return dbWrite(tr -> PermissionManager.login(username, password, directoryLayer, tr));
+  }
+
+  private boolean canNodeBeCreatedOrRemoved(ReadTransaction rt, String targetPath, long userId) {
+    // A node can be created or removed if the user has permissions to write to the parent directory
+
+    // So, let's first grab the parent directory.
+    String parentPath = targetPath.substring(0, targetPath.lastIndexOf("/"));
+
+    // Everyone has access to the root directory
+    if (parentPath.equals("")) {
+      return true;
+    }
+
+    // Return true if the user can both read and write to that directory
+    return checkDirectoryPermission(parentPath, rt, userId, 0200, 0002)
+            && checkDirectoryPermission(parentPath, rt, userId, 0400, 0004);
   }
 }

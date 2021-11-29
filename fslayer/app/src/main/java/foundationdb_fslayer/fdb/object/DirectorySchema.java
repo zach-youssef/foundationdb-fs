@@ -1,5 +1,6 @@
 package foundationdb_fslayer.fdb.object;
 
+import com.apple.foundationdb.KeyValue;
 import com.apple.foundationdb.ReadTransaction;
 import com.apple.foundationdb.Transaction;
 import com.apple.foundationdb.directory.DirectoryLayer;
@@ -18,6 +19,14 @@ public class DirectorySchema extends AbstractSchema{
     private final List<String> metadataPath;
     private String rawPath;
 
+
+    public static class Metadata {
+        public final static String META_ROOT = ".";
+        public final static String VERSION = "VERSION";
+        public final static String UID = "UID";
+        public final static String MODE = "MODE";
+    }
+
     public DirectorySchema(String path){
         this.rawPath = path;
         this.paths = Util.parsePath(path);
@@ -26,8 +35,29 @@ public class DirectorySchema extends AbstractSchema{
     }
 
     public Attr loadMetadata(DirectoryLayer directoryLayer, ReadTransaction rt) {
-        // TODO
-        return new Attr().setObjectType(ObjectType.DIRECTORY);
+        Attr attr =  new Attr().setObjectType(ObjectType.DIRECTORY);
+
+        try {
+            DirectorySubspace metaSpace = getMetadataSpace(directoryLayer, rt);
+            List<KeyValue> metadata = rt.getRange(metaSpace.range()).asList().get();
+
+            for (KeyValue kv : metadata) {
+                String key = metaSpace.unpack(kv.getKey()).getString(0);
+                Tuple value = Tuple.fromBytes(kv.getValue());
+                switch (key) {
+                    case Metadata.UID:
+                        attr = attr.setUid(value.getLong(0));
+                        break;
+                    case Metadata.MODE:
+                        attr = attr.setMode(value.getLong(0));
+                        break;
+                    default:
+                        break;
+                }
+            }
+        } catch (Exception ignored){}
+
+        return attr;
     }
 
     @Override
@@ -49,11 +79,6 @@ public class DirectorySchema extends AbstractSchema{
         return Metadata.VERSION;
     }
 
-    public static class Metadata {
-        public final static String META_ROOT = ".";
-        public final static String VERSION = "VERSION";
-    }
-
     /**
      *  Attempts to delete this directory from the database.
      *  Will return false on failure.
@@ -70,17 +95,32 @@ public class DirectorySchema extends AbstractSchema{
         }
     }
 
+    public boolean setMode(DirectoryLayer directoryLayer, Transaction tr, long mode) {
+        try {
+            DirectorySubspace metaSpace = getMetadataSpace(directoryLayer, tr);
+            tr.set(metaSpace.pack(Metadata.MODE), Tuple.from(mode).pack());
+            incrementVersion(directoryLayer, tr);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     /**
      * Creates this directory in the database.
      * Will return the subspace created, or null if failure occurs.
      * Will silently succeed if the directory already exists.
      */
-    public DirectorySubspace create(DirectoryLayer dir, Transaction transaction) {
+    public DirectorySubspace create(DirectoryLayer dir, Transaction transaction, long mode, long userId) {
         try {
             // Create this directory
             DirectorySubspace subspace =  dir.createOrOpen(transaction, paths).get();
             // Initialize the metadata space
-            initMetadata(dir, transaction);
+            DirectorySubspace metaSpace = initMetadata(dir, transaction);
+            // Set the directory's owner
+            transaction.set(metaSpace.pack(Metadata.UID), Tuple.from(userId).pack());
+            // Set the directory's permissions
+            transaction.set(metaSpace.pack(Metadata.MODE), Tuple.from(mode).pack());
             // Invalidate the cache of the parent directory contents
             incrementParentVersion(dir, transaction);
             return subspace;
@@ -89,17 +129,19 @@ public class DirectorySchema extends AbstractSchema{
         }
     }
 
-    public void initMetadata(DirectoryLayer dir, Transaction transaction) {
+    public DirectorySubspace initMetadata(DirectoryLayer dir, Transaction transaction) {
         try {
             // Create internal metadata subspace
             DirectorySubspace metaSpace = dir.createOrOpen(transaction, metadataPath).get();
             // Initialize the directory's write version
             transaction.set(metaSpace.pack(Metadata.VERSION), Tuple.from(0).pack());
+            return metaSpace;
         } catch (Exception e) {
             System.err.println("Failed to initialize metadata for directory " + rawPath);
             System.err.print("Metadata path = ");
             System.err.println(metadataPath);
             e.printStackTrace();
+            return null;
         }
     }
 }
