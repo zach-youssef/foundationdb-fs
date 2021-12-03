@@ -210,7 +210,6 @@ public class FoundationLayer implements FoundationFileOperations {
   }
 
   @Override
-  // TODO check if file or directory, then set mode accordingly
   public boolean chmod(String path, long mode, long userId) {
     return dbWrite(tr -> isDirectory(path, tr).map(isDir -> {
       if (isDir) {
@@ -230,6 +229,53 @@ public class FoundationLayer implements FoundationFileOperations {
   @Override
   public int open(String path, int flags) {
     return dbWrite(tr -> new FileSchema(path).open(directoryLayer, tr, flags));
+  }
+
+  @Override
+  public boolean move(String oldPath, String newPath, long userId) {
+    return dbWrite(tr-> {
+      String path = newPath;
+      if (isDirectory(newPath, tr).orElse(false)) {
+        path += oldPath.substring(oldPath.lastIndexOf("/") + 1);
+      }
+      return recursiveMove(oldPath, path, tr, userId)
+              && new DirectorySchema(oldPath).delete(directoryLayer, tr);
+    });
+  }
+
+  public boolean recursiveMove(String oldPath, String newPath, Transaction transaction, long userId) {
+    System.out.printf("Renaming %s to %s\n", oldPath, newPath);
+    return isDirectory(oldPath, transaction).map(isDir -> {
+      if (isDir) {
+        // Grab the metadata from the old directory
+        Attr oldMetadata = getDirectoryMetadata(oldPath, transaction);
+
+        // Create the new directory
+        DirectorySchema newDir = new DirectorySchema(newPath);
+        newDir.create(directoryLayer, transaction, oldMetadata.getMode(), oldMetadata.getUid());
+
+        // Recur on all subdirectories, then on child files
+        List<String> childPaths = ls(oldPath, oldMetadata.getUid());
+        boolean subDirCopySuccess = childPaths.stream()
+                .filter(child -> isDirectory(oldPath + "/" + child, transaction).orElse(false))
+                .allMatch(subDir -> recursiveMove(
+                        oldPath + "/" + subDir,
+                        newPath + "/" + subDir,
+                        transaction, userId));
+
+         return subDirCopySuccess &&
+                childPaths.stream()
+                        .filter(child -> !isDirectory(oldPath + "/" + child, transaction).orElse(true))
+                        .filter(child -> !child.equals("."))
+                        .allMatch(file -> new FileSchema(oldPath + "/" + file)
+                                .move(directoryLayer, transaction, newPath + "/" + file) != null);
+
+
+      } else {
+        new FileSchema(oldPath).move(directoryLayer, transaction, newPath);
+        return true;
+      }
+    }).orElse(false);
   }
 
   @Override

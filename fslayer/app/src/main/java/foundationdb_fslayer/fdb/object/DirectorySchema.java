@@ -85,9 +85,9 @@ public class DirectorySchema extends AbstractSchema{
      */
     public boolean delete(DirectoryLayer dir, Transaction transaction) {
         try {
-            dir.removeIfExists(transaction, paths).get();
             transaction.clear(getMetadataSpace(dir, transaction).range());
             dir.removeIfExists(transaction, metadataPath).get();
+            dir.removeIfExists(transaction, paths).get();
             incrementParentVersion(dir, transaction);
             return true;
         } catch (Exception e) {

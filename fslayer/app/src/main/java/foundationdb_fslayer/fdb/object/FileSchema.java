@@ -78,6 +78,7 @@ public class FileSchema extends AbstractSchema {
 
             return true;
         } catch (Exception e) {
+            System.out.println("Failed to create file");
             e.printStackTrace();
             return false;
         }
@@ -407,5 +408,27 @@ public class FileSchema extends AbstractSchema {
         if (!FsCacheSingleton.fileInCache(rawPath)) {
             FsCacheSingleton.loadFileToCache(rawPath, directoryLayer, rt);
         }
+    }
+
+    public FileSchema move(DirectoryLayer directoryLayer, Transaction transaction, String newPath) {
+        // Create the new file subspace
+        FileSchema newNode = new FileSchema(newPath);
+        newNode.create(directoryLayer, transaction);
+
+        // Copy the metadata to the new destination
+        Attr currentMetadata = this.getMetadata(directoryLayer, transaction);
+        newNode.setOwnership(directoryLayer, transaction, currentMetadata.getUid(), currentMetadata.getGid());
+        newNode.setMode(directoryLayer, transaction, currentMetadata.getMode(), currentMetadata.getUid());
+        newNode.setTimestamp(directoryLayer, transaction, currentMetadata.getTimestamp());
+
+        // Copy the file's bytes to the new file
+        byte[] data = this.read(directoryLayer, transaction, 0, this.size(directoryLayer, transaction), currentMetadata.getUid());
+        newNode.write(directoryLayer, transaction, data, 0, currentMetadata.getUid());
+
+        // Remove this node
+        this.delete(directoryLayer, transaction);
+
+        // Return the new file schema
+        return newNode;
     }
 }
