@@ -163,4 +163,9 @@ public class FuseLayer extends FuseStubFS {
   public int chown(String path, long uid, long gid) {
     return -ErrorCodes.EACCES();
   }
+
+  @Override
+  public int rename(String oldpath, String newpath) {
+    return dbOps.move(oldpath, newpath, userId) ? 0 : -ErrorCodes.ENOENT();
+  }
 }

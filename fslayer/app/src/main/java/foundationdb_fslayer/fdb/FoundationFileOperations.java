@@ -107,6 +107,8 @@ public interface FoundationFileOperations {
 
   int open(String path, int flags);
 
+  boolean move(String oldPath, String newPath, long userId);
+
   void initRootIfNeeded();
 
   Optional<PermissionManager> login(String username, String password);
