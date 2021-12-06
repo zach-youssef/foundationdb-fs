@@ -1,7 +1,5 @@
 # FoundationFS - File System Layer over FoundationDB
 
----
-
 [Demo 1 Video](https://www.youtube.com/watch?v=zTL-7-rizSc)
 
 [Demo 2 Video](https://youtu.be/6cjEmFCT3UU)
@@ -21,65 +19,141 @@ Each individual key retrieval or update has the potential to be slow. In order f
 
 By running additional instances of FoundationDB, our software layer should scale without any changes. If our filesystem design is successful, this open source project will hopefully be a useful layer that can be shared with the larger FoundationDB community.
 
-## Users/Personas Of The Project
+Our original project propsal can be found [here](proposal.md).
 
-FoundationDB is designed for users who favor Consistency, Distribution, Scalability, Security of data storage (e.g. financial transactions) over performance / speed. This project intends to add a distributed file system layer using key-value pair mapping to allow client applications to perform file / directory operations in a uniform way. For instance, users can perform *read* and *write* operations to a file, while more complex operations like *links* or *rename* might be implemented at the end. 
+## Installation and Setup 
 
-We could see this filesystem being mounted either by desktop users sharing resources, or by servers accessing shared datacenter storage.
+### Notice for Windows Users
 
----
+While Windows can be used to run FDB server instances, our client does not support non-unix operating systems, and will not work on Windows 
+(or in Windows Subsystem for Linux, which at this time does not support FUSE).
 
-## Scope and Features Of The Project
+### FDB Configuration
 
-Support common file system functionalities such as read, write, move, rename and delete. Hard and symbolic link support will serve as interesting stretch goals.
+Full instructions for downloading the FDB client and server are available for [Linux](https://apple.github.io/foundationdb/getting-started-linux.html) and [MacOS](https://apple.github.io/foundationdb/getting-started-mac.html). 
 
-To our users, our system should appear like any other mounted drive. Under the hood, we will have designed a consistent method for mapping filesystem operations to key-value updates and reads.
+For the client devices running the fslayer, you will only need to install `fdbclient`. Likewise, the machines hositng the database will only need `fdbserver`. 
 
-Operations performed on the File System could be slow due to stable architecture provided by FoundationDB
+Both clients and servers will need to have a [cluster file](https://apple.github.io/foundationdb/administration.html#cluster-files) configured.
 
-Provide a test suite for Client File system that is resilient to failures in a distributed setting
+Once the cluster files are configured, each [server can be started](https://apple.github.io/foundationdb/administration.html#starting-and-stopping) with your system daemon of choice, or with the `fdbserver` command.
 
----
+### Fuse Installation (Mac Client Only)
+(Linux users with an up-to-date kernel should not need to perform this step)
 
-## Solution Concept
+To run the fslayer client on a MacOS machine, you will need to download and install [macFUSE](https://github.com/osxfuse/osxfuse/releases).
 
-We will be using Java to develop a client layout that bridges the FUSE and FoundationDB APIs.
+### Building the client
 
+From the `fslayer` directory, you can run
 
-The actual method we use to map a file/directory structure over a key value store will require time and resources to design, and we consider it the primary challenge of the project. We will explore the methodologies used by existing key-value filesystems (such as kvefs), mimicking an ext-style inode tree, as well as explore variations on naive approaches such as simply having the file path be the key used in the store.
+```
+make build
+```
+or
+```
+./gradlew installDist
+```
 
+to install the application to `fslayer/app/build/install/app`. You can then copy the bin & lib contents to your root directory, if you are root, or run the application from there.
 
-The end result should have an architecture similar to the following:
+Alternatively, you can produce a zip distribution with
+```
+make zip
+```
+or
+```
+./gradlew distZip
+```
+which will be output to `fslayer/app/build/distributions`.
+
+## Running the FoundationFS Client
+
+To run the client and mount the FoundationDB Filesystem, run
+
+```
+fslayer <mount-path>
+```
+with the only argument being the directory you wish to mount the filesystem to.
+
+### Logging in
+
+You will be prompted for a username and password. If this is your first time, you can enter any username and password and the database will record that as your login information. On subsequent logins, you can use the same username & password combination.
+
+## How does it work?
+
+Our filesystem client leverages FoundationDB's ACID guaruntees (Atomicity, Consistency, Isolation, Durability) to provide a stable and consistent distributed filesystem.
+
+Filesystem operations are passed to our client through use of Unix's Filesystem in USErspace (FUSE) functionality. These operations are then converted into key-value operations to access or modify the data stored in FoundationDB.
 
 ![Image of Diagram](Architecture.png)
 
----
+### Key-Value Schema
 
-## Acceptance criteria
+We use FoundationDB's DirectoryLayer extensively to create and manage unique key prefixes for each file and directory stored.
+A detailed spec for the Java DirectoryLayer implementation can be found [here](https://apple.github.io/foundationdb/javadoc/com/apple/foundationdb/directory/DirectoryLayer.html);
 
-- Design a mapping between a files and directories structure to key-value
-- The ability to *read*, *write*, *open*, *close*, and *rename*, both files and directories from our Java layer.
-- Being able to mount our application as a FUSE directory in Linux
-  + Stretch goals
-  + Hard links
-  + Soft links
-  + Permission system (*chmod*)
-- Test suite ensures File system is resilient to random failures and concurrency issues
+In our schema, a file is a DirectorySubspace. Each fixed-size chunk of data is stored with the key prefix generated from `<path-to-file>/CHUNKS/<index>`.
+Metadata such as `mode`, `uid`, and `m_time` are stored as keys with the file's subspace prefix.
 
----
+![image](https://user-images.githubusercontent.com/10442582/144931380-057dc574-814c-4b39-aacb-6f66cf2676d9.png)
 
-## Release Planning
+Directories are also DirectorySubspaces. Their metadata is stored with the subspace prefix `<path-to-dir>/.`. The presence of the `.` subspace distinguishes directories from files. 
 
-We will attempt to deliver our product in the following stages of functionality:
-1. Small Java client that can *read* and *write* key-value pairs to a FoundationDB cluster
-2. A complete spec for our key-value filesystem mapping
-3. Ability to perform *read*, *write*, *rmdir*, and *mkdir* operations to our Java layer
-4. FUSE API integration for simple file/directory operations
-5. Implement stretch features to Java client & FUSE integration 
+![image](https://user-images.githubusercontent.com/10442582/144931406-90a98d60-84eb-4dc3-a05f-ec505aa4d06a.png)
 
----
-## General comments
+This schema allows us to easily list a directory's contents by grabbing all child prefixes, grab all the file data from loading the keyrange of the chunk subspace, and quickly access a file or directory's information from their path.
 
-FoundationDB is a NoSQL database armed with ACID property. Using FoundationDB as the underlying storage for a file system offers many advantages, including strong security, high reliability, and easy-to-scale. Our file system layer targets customers who prefer their system to be reliable or when reliability and security is the first concern.
+### Client Caching
 
-FUSE is a Linux kernel module used to mount userspace programs as Unix-compatible filesystems. The reference implementation can be found at [here](https://github.com/libfuse/libfuse). We plan on using an open source set of Java bindings found at [here](https://github.com/SerCeMan/jnr-fuse).
+A `VERSION` is a counter stored in every file or directory's metadata as its own key-value pair. Everytime a file or its metadata is modified, that version is increased by one. Whenever a directory's metadata is changed, or a file/directory is added or removed to it, it's version increments as well.
+
+![image](https://user-images.githubusercontent.com/10442582/144931435-d9ba2b7b-95d8-466b-9e52-6a8ec3c10bcc.png)
+
+On a succesful read of a file or directory's contents, the client will cache the data, along with the `VERSION` of that file or directory.
+
+On subsequent reads, the client will compare the cached version of a file or directory to the value in the database, and update it's cache if they do not match. Because of FoundationDB's gaurunteed consistency and atomicity, we know that by checking this version we will always be viewing the most current state of the filesystem.
+
+### Unix Permissions
+
+Each user that logs into the client gets assigned a UID starting at 70001 for operations on the database. This is the id that will be used to evaluate ownership and permissions on files. The ID for a user will be displayed in the console after a succesful login.
+
+Please note that while files and directories might still display group permissions, group membership is currently not supported and will not be evaluated when determining if a user has access to a file operation. All users other than a file's owner will be evaluated using the "other" permission mode.
+
+#### Permission data schema
+
+The database's mappings from username to userID are stored in the subspace `./IDMAP/<username>`, 
+while a user's PBKDF2 password hash is stored in  `./AUTH/<username>`.
+
+![image](https://user-images.githubusercontent.com/10442582/144931480-1d8bf8cc-d506-4469-90ef-d863cf8bb3c5.png)
+
+The key `./ID_COUNTER` stores the counter used to generate new unique UIDs.
+
+![image](https://user-images.githubusercontent.com/10442582/144931508-4ed1466c-966f-4b55-9ad7-a8ac5b4410b8.png)
+
+### Code Pointers
+
+The entry point for the application is [App.java](fslayer/app/src/main/java/foundationdb_fslayer/App.java).
+
+Here, you can see it create our wrapper around FDB, call our login manager, and pass both objects to our Fuse wrapper, which is then mounted.
+
+#### PermissionManager
+
+The [PermissionManager](fslayer/app/src/main/java/foundationdb_fslayer/permissions/PermissionManager.java) class handles password validation & storage, as well as loading user id mappings from the database.
+
+#### FuseLayer
+
+The [FuseLayer](fslayer/app/src/main/java/foundationdb_fslayer/fuse/FuseLayer.java) class implements the FuseStubFS interface provided by `jnr-fuse`. It translates the information from system calls into arguments pased to our FoundationDB operations, then parses that result into what the system expects.
+
+#### FoundationLayer
+
+[FoundationLayer.java](fslayer/app/src/main/java/foundationdb_fslayer/fdb/FoundationLayer.java) implements our 
+[FoundationFileOperations.java](fslayer/app/src/main/java/foundationdb_fslayer/fdb/FoundationFileOperations.java) interface.
+
+This class stores a reference to the actual FoundationDB java object and makes db transactions to perform system filesystem calls.
+
+In many of its methods, it determines if a path is a directory or file, then instantiates and delegates the system operation to an object representing the filesystem object in question.
+
+##### FileSchema & DirectorySchema
+
+[FileSchema](fslayer/app/src/main/java/foundationdb_fslayer/fdb/object/FileSchema.java) and [DirectorySchema](fslayer/app/src/main/java/foundationdb_fslayer/fdb/object/DirectorySchema.java) represent file objects at a given path. Their methods take in a reference to the `DirectoryLayer` and a database transaction, then use these to read or modify the necessary keys to perform the file operation.
