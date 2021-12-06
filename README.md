@@ -130,3 +130,30 @@ while a user's PBKDF2 password hash is stored in  `./AUTH/<username>`.
 The key `./ID_COUNTER` stores the counter used to generate new unique UIDs.
 
 ![image](https://user-images.githubusercontent.com/10442582/144931508-4ed1466c-966f-4b55-9ad7-a8ac5b4410b8.png)
+
+### Code Pointers
+
+The entry point for the application is [App.java](fslayer/app/src/main/java/foundationdb_fslayer/App.java).
+
+Here, you can see it create our wrapper around FDB, call our login manager, and pass both objects to our Fuse wrapper, which is then mounted.
+
+#### PermissionManager
+
+The [PermissionManager](fslayer/app/src/main/java/foundationdb_fslayer/permissions/PermissionManager.java) class handles password validation & storage, as well as loading user id mappings from the database.
+
+#### FuseLayer
+
+The [FuseLayer](fslayer/app/src/main/java/foundationdb_fslayer/fuse/FuseLayer.java) class implements the FuseStubFS interface provided by `jnr-fuse`. It translates the information from system calls into arguments pased to our FoundationDB operations, then parses that result into what the system expects.
+
+#### FoundationLayer
+
+[FoundationLayer.java](fslayer/app/src/main/java/foundationdb_fslayer/fdb/FoundationLayer.java) implements our 
+[FoundationFileOperations.java](fslayer/app/src/main/java/foundationdb_fslayer/fdb/FoundationFileOperations.java) interface.
+
+This class stores a reference to the actual FoundationDB java object and makes db transactions to perform system filesystem calls.
+
+In many of its methods, it determines if a path is a directory or file, then instantiates and delegates the system operation to an object representing the filesystem object in question.
+
+##### FileSchema & DirectorySchema
+
+[FileSchema](fslayer/app/src/main/java/foundationdb_fslayer/fdb/object/FileSchema.java) and [DirectorySchema](fslayer/app/src/main/java/foundationdb_fslayer/fdb/object/DirectorySchema.java) represent file objects at a given path. Their methods take in a reference to the `DirectoryLayer` and a database transaction, then use these to read or modify the necessary keys to perform the file operation.
