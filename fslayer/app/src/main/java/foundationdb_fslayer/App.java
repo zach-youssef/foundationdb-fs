@@ -40,7 +40,12 @@ public class App {
     System.out.print("Username: ");
     String username = in.nextLine();
     System.out.print("Password: ");
-    String password = String.valueOf(System.console().readPassword());
+    String password;
+    try{
+        password = String.valueOf(System.console().readPassword());
+    } catch (NullPointerException e) {
+        password = in.nextLine();
+    }
 
     return db.login(username, password);
   }
