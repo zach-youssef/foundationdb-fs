@@ -302,9 +302,11 @@ public class FileSchema extends AbstractSchema {
     }
 
     public boolean truncate(DirectoryLayer directoryLayer, Transaction transaction, long size, long userId) {
+        System.out.println("Truncating file to " + size);
         if (!modifyPermitted(directoryLayer, transaction, userId)) {
             return false;
         }
+
         // Calculate how much we need to delete
         int currentSize = this.size(directoryLayer, transaction);
         int bytesToDelete = currentSize - (int) size;
@@ -322,8 +324,10 @@ public class FileSchema extends AbstractSchema {
             int lastChunk = currentSize / CHUNK_SIZE_BYTES;
             int newLastChunk = (int) size / CHUNK_SIZE_BYTES;
 
-            // Clear out data at end of file
-            transaction.clear(chunkSpace.pack(newLastChunk + 1), chunkSpace.pack(lastChunk));
+            if (newLastChunk + 1 < lastChunk) {
+                // Clear out data at end of file
+                transaction.clear(chunkSpace.pack(newLastChunk + 1), chunkSpace.pack(lastChunk));
+            }
 
             // Check how much data of the new last chunk we need to delete
             currentSize = this.size(directoryLayer, transaction);
@@ -337,6 +341,7 @@ public class FileSchema extends AbstractSchema {
                 transaction.set(chunkSpace.pack(newLastChunk), newChunkData);
             }
             this.incrementVersion(directoryLayer, transaction);
+            System.out.println("Truncate successful");
             return true;
 
         } catch (Exception e) {
