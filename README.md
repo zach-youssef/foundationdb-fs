@@ -96,20 +96,19 @@ A detailed spec for the Java DirectoryLayer implementation can be found [here](h
 In our schema, a file is a DirectorySubspace. Each fixed-size chunk of data is stored with the key prefix generated from `<path-to-file>/CHUNKS/<index>`.
 Metadata such as `mode`, `uid`, and `m_time` are stored as keys with the file's subspace prefix.
 
-// TODO INSERT IMAGE \\
+![image](https://user-images.githubusercontent.com/10442582/144931380-057dc574-814c-4b39-aacb-6f66cf2676d9.png)
 
 Directories are also DirectorySubspaces. Their metadata is stored with the subspace prefix `<path-to-dir>/.`. The presence of the `.` subspace distinguishes directories from files. 
 
-// TODO INSERT IMAGE \\
+![image](https://user-images.githubusercontent.com/10442582/144931406-90a98d60-84eb-4dc3-a05f-ec505aa4d06a.png)
 
 This schema allows us to easily list a directory's contents by grabbing all child prefixes, grab all the file data from loading the keyrange of the chunk subspace, and quickly access a file or directory's information from their path.
 
 ### Client Caching
 
-
 A `VERSION` is a counter stored in every file or directory's metadata as its own key-value pair. Everytime a file or its metadata is modified, that version is increased by one. Whenever a directory's metadata is changed, or a file/directory is added or removed to it, it's version increments as well.
 
-// TODO INSERT IMAGE \\
+![image](https://user-images.githubusercontent.com/10442582/144931435-d9ba2b7b-95d8-466b-9e52-6a8ec3c10bcc.png)
 
 On a succesful read of a file or directory's contents, the client will cache the data, along with the `VERSION` of that file or directory.
 
@@ -126,6 +125,8 @@ Please note that while files and directories might still display group permissio
 The database's mappings from username to userID are stored in the subspace `./IDMAP/<username>`, 
 while a user's PBKDF2 password hash is stored in  `./AUTH/<username>`.
 
+![image](https://user-images.githubusercontent.com/10442582/144931480-1d8bf8cc-d506-4469-90ef-d863cf8bb3c5.png)
+
 The key `./ID_COUNTER` stores the counter used to generate new unique UIDs.
 
-// TODO INSERT IMAGE \\
+![image](https://user-images.githubusercontent.com/10442582/144931508-4ed1466c-966f-4b55-9ad7-a8ac5b4410b8.png)
