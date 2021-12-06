@@ -16,8 +16,9 @@ for dir in $client1 $client2 $client3; do
 done
 
 # Compile Distribution
+echo "Building client."
 codedir=${SCRIPT_DIR}/../fslayer
-${codedir}/gradlew installDist -p ${codedir}
+${codedir}/gradlew installDist -p ${codedir} > /dev/null
 
 # Save the name of the executable
 execdir=${codedir}/app/build/install/app/bin/
@@ -25,6 +26,7 @@ execdir=${codedir}/app/build/install/app/bin/
 trap "kill 0" EXIT
 
 # Mount our 3 concurrent clients
+echo "Mounting clients."
 for dir in $client1 $client2 $client3; do
 	printf "$dir\n$dir\n" | ${execdir}/app $dir > /dev/null 2>&1 &
 done
@@ -33,6 +35,8 @@ done
 testfile=test-file
 touch $client1/$testfile
 chmod 666 $client1/$testfile
+
+echo "Starting test..."
 
 # Perform an initial write & read from each client so they have something
 # in their cache
@@ -63,7 +67,7 @@ fi
 
 # Finish
 cat <<BLOCK
-Cach test succesful!
+Cache test succesful!
 Clients agree on file value after 300 total writes.
 BLOCK
 exit 0;
