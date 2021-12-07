@@ -80,6 +80,16 @@ with the only argument being the directory you wish to mount the filesystem to.
 
 You will be prompted for a username and password. If this is your first time, you can enter any username and password and the database will record that as your login information. On subsequent logins, you can use the same username & password combination.
 
+## Testing
+
+We have run FoundationFS against a small suite of filesystem tests. Documentation for those results can be found [here](https://docs.google.com/document/d/1wYN_tJ4bQFcuGFnopmGAmCfo3AxpNYdT-SbvnkJ2kFU/edit#)
+
+If your FDB client and server are set up, you can run [cache-test.bash](testing/cache.bash) to verify that the cache versioning holds up when there are 100s of concurrent transactions.
+
+```
+testing/cache-test.bash
+```
+
 ## How does it work?
 
 Our filesystem client leverages FoundationDB's ACID guaruntees (Atomicity, Consistency, Isolation, Durability) to provide a stable and consistent distributed filesystem.
